@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pref_blok/database/database_helper.dart';
+import 'package:pref_blok/database/game_queries.dart';
 import '../models/models.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'add_player_dialog.dart';
@@ -7,9 +8,13 @@ import '../database/player_queries.dart';
 
 class NewGameDialog extends StatefulWidget {
   final Function(Game) onCreateGame;
+  final Game? game;
+  final List<Player>? players;
 
   const NewGameDialog({
     required this.onCreateGame,
+    this.game,
+    this.players,
     super.key
   });
 
@@ -21,17 +26,20 @@ class _NewGameDialogState extends State<NewGameDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _startScoreController = TextEditingController();
-  final List<TextEditingController> _playerControllers = List.generate(3, (_) => TextEditingController());
+  final List<TextEditingController> _playerControllers = List.generate(4, (_) => TextEditingController());
   final ScrollController _scrollController = ScrollController();
-  List<FocusNode> _dropdownFocusNodes = List.generate(3, (index) => FocusNode());
+  List<FocusNode> _dropdownFocusNodes = List.generate(4, (index) => FocusNode());
 
   final DatabaseHelper dbHelper = DatabaseHelper();
   final PlayerQueries playerQueries = PlayerQueries();
+  final GameQueries gameQueries = GameQueries();
 
   List<Player> _players = [];
-  List<Player?> _selectedPlayers = List.filled(3, null);
-  List<Player> _placeholderPlayers = List.generate(3, (_) => Player(name: ''));
-  List<bool> _dropdownValid = List.filled(3, true);
+  List<Player?> _selectedPlayers = List.filled(4, null);
+  List<Player> _placeholderPlayers = List.generate(4, (_) => Player(name: ''));
+  List<bool> _dropdownValid = List.filled(4, true);
+
+  int _noOfPlayers =  3;
 
   @override
   void initState(){
@@ -41,10 +49,21 @@ class _NewGameDialogState extends State<NewGameDialog> {
       _playerControllers[i].addListener( () {
           setState(() {
             _selectedPlayers[i] = new Player(name: _playerControllers[i].text);
-            _dropdownValid = List.filled(3, true);
+            _dropdownValid = List.filled(4, true);
           });
         }
       );
+
+      if (widget.game != null && widget.players != null){
+        if (widget.game!.name != null) _nameController.text = widget.game!.name!;
+        for (int i = 0; i < widget.game!.noOfPlayers; i++){
+          Player player = widget.players![i];
+          _playerControllers[i].text = player.name;
+          _selectedPlayers[i] = player;
+          _noOfPlayers = widget.players!.length;
+          _startScoreController.text = widget.game!.startingScore.toString();
+        }
+      }
     }
   }
 
@@ -58,7 +77,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
 
   Future<bool> _checkPlayers() async{
     bool valid = true;
-    for (int i = 0; i < 3; i++){
+    for (int i = 0; i < _noOfPlayers; i++){
       if (_selectedPlayers[i] != null){
         _selectedPlayers[i] = await playerQueries.GetPlayerByName(_selectedPlayers[i]!.name);
       }
@@ -75,6 +94,8 @@ class _NewGameDialogState extends State<NewGameDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _scrollController.dispose();
+    _startScoreController.dispose();
     for(var controlller in _playerControllers){
       controlller.dispose();
     }
@@ -109,28 +130,68 @@ class _NewGameDialogState extends State<NewGameDialog> {
 
     int startingScore = int.parse(_startScoreController.text);
 
-    Game game = Game(
+    if (widget.game != null  && widget.game!.id != null){
+      Game updatedGame = widget.game!;
+      updatedGame.name = _nameController.text;
+      updatedGame.noOfPlayers = _noOfPlayers;
+      updatedGame.startingScore = startingScore;
+
+      List<ScoreSheet> scoreSheets = await gameQueries.getScoreSheetsGame(updatedGame.id);
+      for (int i = 0; i < scoreSheets.length; i++){
+        ScoreSheet scoreSheet = scoreSheets[i];
+        if (_selectedPlayers[i] != null && _selectedPlayers[i]!.id != null){
+          scoreSheet.playerId = _selectedPlayers[i]!.id!;
+          scoreSheet.position = i;
+
+          await dbHelper.updateScoreSheet(scoreSheet);
+        }
+      }
+
+      if (scoreSheets.length < _noOfPlayers) {
+        ScoreSheet newScoreSheet = ScoreSheet(
+          playerId: _selectedPlayers.last!.id!,
+          gameId: updatedGame.id!,
+          totalScore: updatedGame.startingScore,
+          position: 3
+        );
+
+        dbHelper.insertScoreSheet(newScoreSheet);
+      }
+
+      if (scoreSheets.length > _noOfPlayers) {
+         dbHelper.deleteScoreSheet(scoreSheets.last.id!);
+      }
+
+      await dbHelper.updateGame(updatedGame);
+      widget.onCreateGame(updatedGame);
+
+    }
+    else {
+      Game game = Game(
         date: DateTime.now(),
-        noOfPlayers: _selectedPlayers.length,
+        noOfPlayers: _noOfPlayers,
         startingScore: startingScore,
         name: _nameController.text,
-    );
-
-    int gameId = await dbHelper.insertGame(game);
-
-    game.id = gameId;
-
-    for (int i = 0; i < _selectedPlayers.length; i++){
-      ScoreSheet scoreSheet = ScoreSheet(
-        playerId: _selectedPlayers[i]!.id!,
-        gameId: gameId,
-        totalScore: startingScore,
       );
 
-      dbHelper.insertScoreSheet(scoreSheet);
+      int gameId = await dbHelper.insertGame(game);
+
+      game.id = gameId;
+
+      for (int i = 0; i < _noOfPlayers; i++) {
+        ScoreSheet scoreSheet = ScoreSheet(
+          playerId: _selectedPlayers[i]!.id!,
+          gameId: gameId,
+          totalScore: startingScore,
+          position: i,
+        );
+
+        dbHelper.insertScoreSheet(scoreSheet);
+      }
+      widget.onCreateGame(game);
+
     }
 
-    widget.onCreateGame(game);
     Navigator.of(context).pop();
   }
 
@@ -146,6 +207,14 @@ class _NewGameDialogState extends State<NewGameDialog> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      widget.game == null ? 'Nova partija' : 'Uređivanje partije',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 16,),
                   Form(
                     key: _formKey,
                     child: Column(
@@ -180,7 +249,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
                             _formKey.currentState?.validate();
                           },
                         ),
-                        for (int i = 0; i < 3; i++)
+                        for (int i = 0; i < _noOfPlayers; i++)
                           Column(
                             children: [
                               Padding(
@@ -245,6 +314,27 @@ class _NewGameDialogState extends State<NewGameDialog> {
                             ]),
                       ],
                     ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(_noOfPlayers == 4 ? "Ukloni 4. igrača" : "Dodaj 4. igrača"),
+                      IconButton(
+                        icon: Icon(_noOfPlayers == 4 ? Icons.remove_circle : Icons.add_circle),
+                        color: _noOfPlayers == 4 ? Colors.red : Colors.green,
+                        onPressed: () {
+                          setState(() {
+                            if (_noOfPlayers == 4){
+                              _noOfPlayers = 3;
+                              _selectedPlayers[3] = null;
+                              _dropdownValid[3] = true;
+                            } else {
+                              _noOfPlayers = 4;
+                            }
+                          });
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16.0),
                   Row(

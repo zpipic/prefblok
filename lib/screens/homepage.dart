@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pref_blok/screens/game_screen.dart';
 import 'package:pref_blok/screens/new_game_dialog.dart';
 import 'package:pref_blok/screens/players_list_page.dart';
 import '../database/database_helper.dart';
@@ -21,10 +22,10 @@ class _HomePageState extends State<Homepage> {
   @override
   void initState() {
     super.initState();
-    _refreshGameList();
+    _loadGames();
   }
 
-  void _refreshGameList() async {
+  void _loadGames() async {
     final data = await dbHelper.getGames();
     setState(() {
       _games = data;
@@ -38,16 +39,28 @@ class _HomePageState extends State<Homepage> {
     });
   }
 
-  void _addNewGame(){
+  void _addNewGame({Game? existingGame, List<Player>? players}){
     showDialog(
         context: context,
         builder: (BuildContext context) {
-          return NewGameDialog(onCreateGame: (newGame) {
-            setState(() {
-              _games.add(newGame);
-            });
+          if (existingGame != null && players != null){
+            return NewGameDialog(onCreateGame: (newGame) {
+              setState(() {
+                _loadGames();
+              });
+            },
+              game: existingGame,
+              players: players,
+            );
+          }
+          else {
+            return NewGameDialog(onCreateGame: (newGame) {
+              setState(() {
+                _games.insert(0, newGame);
+              });
           });
-        },
+        }
+      },
     );
   }
 
@@ -55,6 +68,13 @@ class _HomePageState extends State<Homepage> {
     Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const PlayersListPage())
+    );
+  }
+
+  void _navigateToGamePage(Game game){
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => GameScreen(game: game))
     );
   }
 
@@ -90,6 +110,31 @@ class _HomePageState extends State<Homepage> {
     );
   }
 
+  void _deleteGame(Game game) async {
+    bool? confirmDelete = await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Brisanje partije'),
+          content: Text('Obrisati partiju "${game.name}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Odustani'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Obriši'),
+            )
+          ],
+        )
+    );
+
+    if (confirmDelete == true) {
+      await dbHelper.deleteGame(game.id!);
+      _loadGames();
+    }
+  }
+
   @override
   Widget build(BuildContext context){
     return Scaffold(
@@ -97,7 +142,7 @@ class _HomePageState extends State<Homepage> {
         title: const Text('Partije'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.drag_handle),
+            icon: const Icon(Icons.menu),
             onPressed: () => _openMenu(context),
           )
         ],
@@ -121,6 +166,10 @@ class _HomePageState extends State<Homepage> {
                     List<Player>? players = snapshot.data;
                     String playerNames = players!.map((p) => p.name).join(', ');
                     return ListTile(
+                      leading: Icon(
+                        game.isFinished ? Icons.check_circle : Icons.access_time,
+                        color: game.isFinished ? Colors.green : Colors.orange,
+                      ),
                       title: Text(
                         (game.name?.trim().isNotEmpty ?? false) ? game.name! : '<nema ime>',
                         style: (game.name?.trim().isNotEmpty ?? false)
@@ -130,12 +179,21 @@ class _HomePageState extends State<Homepage> {
                       subtitle: Text(
                           '''Datum: ${game.dateToString()}\nIgrači: $playerNames'''
                       ),
-                      trailing: Icon(
-                        game.isFinished ? Icons.check_circle : Icons.access_time,
-                        color: game.isFinished ? Colors.green : Colors.orange,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _addNewGame(existingGame: game, players: players),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () => _deleteGame(game),
+                          )
+                        ],
                       ),
                       onTap: () {
-
+                        _navigateToGamePage(game);
                       },
                     );
                   } else{
@@ -149,7 +207,7 @@ class _HomePageState extends State<Homepage> {
                         color: game.isFinished ? Colors.green : Colors.orange,
                       ),
                       onTap: () {
-
+                        _navigateToGamePage(game);
                       },
                     );
                   }

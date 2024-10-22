@@ -12,6 +12,7 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
   int leftSoupTotal;
   int rightSoupTotal;
   int? rightSoupTotal2;
+  int position;
 
   ScoreSheet({
     this.id,
@@ -24,7 +25,8 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
     required this.totalScore,
     this.leftSoupTotal = 0,
     this.rightSoupTotal = 0,
-    this.rightSoupTotal2
+    this.rightSoupTotal2,
+    required this.position,
   });
 
 
@@ -39,14 +41,15 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
       'id': this.id,
       'playerId': this.playerId,
       'gameId': this.gameId,
-      'refe': this.refe,
-      'refeLeft': this.refeLeft,
-      'refeRight': this.refeRight,
-      'refeRight2': this.refeRight2,
+      'refe': this.refe ? 1 : 0,
+      'refeLeft': this.refeLeft ? 1 : 0,
+      'refeRight': this.refeRight ? 1 : 0,
+      'refeRight2': refeRight2 != null ? (refeRight2! ? 1 : 0) : null,
       'totalScore': this.totalScore,
       'leftSoupTotal': this.leftSoupTotal,
       'rightSoupTotal': this.rightSoupTotal,
       'rightSoupTotal2': this.rightSoupTotal2,
+      'position': this.position,
     };
   }
 
@@ -58,11 +61,12 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
       refe: map['refe'] == 1,
       refeLeft: map['refeLeft'] == 1,
       refeRight: map['refeRight'] == 1,
-      refeRight2: map['refeRight2'] == 1,
+      refeRight2: map['refeRight2'] != null ? (map['refeRight2'] == 1) : null,
       totalScore: map['totalScore'],
       leftSoupTotal: map['leftSoupTotal'],
       rightSoupTotal: map['rightSoupTotal'],
       rightSoupTotal2: map['rightSoupTotal2'],
+      position: map['position'],
     );
   }
 }

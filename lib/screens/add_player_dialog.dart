@@ -67,7 +67,7 @@ class _AddPlayerDialogState extends State<AddPlayerDialog>{
         Navigator.of(context).pop();
       } else {
         setState(() {
-          _errorMsg = 'Ime več postoji';
+          _errorMsg = 'Ime već postoji';
           _formKey.currentState!.validate();
         });
       }

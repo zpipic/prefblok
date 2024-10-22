@@ -28,6 +28,13 @@ class _HomePageState extends State<Homepage> {
     final data = await dbHelper.getGames();
     setState(() {
       _games = data;
+      _games.sort((a, b) {
+        if (a.isFinished != b.isFinished){
+          return a.isFinished ? 1 : -1;
+        }
+
+        return b.date.compareTo(a.date);
+      });
     });
   }
 
@@ -36,7 +43,9 @@ class _HomePageState extends State<Homepage> {
         context: context,
         builder: (BuildContext context) {
           return NewGameDialog(onCreateGame: (newGame) {
-            dbHelper.insertGame(newGame);
+            setState(() {
+              _games.add(newGame);
+            });
           });
         },
     );
@@ -85,7 +94,7 @@ class _HomePageState extends State<Homepage> {
   Widget build(BuildContext context){
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Games'),
+        title: const Text('Partije'),
         actions: [
           IconButton(
             icon: const Icon(Icons.drag_handle),
@@ -103,18 +112,27 @@ class _HomePageState extends State<Homepage> {
               return FutureBuilder<List<Player>>(
                 future: gameQueries.getPlayersInGame(game.id),
                 builder: (context, snapshot) {
-                  if (snapshot.hasData){
+                  if (snapshot.connectionState == ConnectionState.waiting){
+                    return Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  else if (snapshot.hasData){
                     List<Player>? players = snapshot.data;
                     String playerNames = players!.map((p) => p.name).join(', ');
                     return ListTile(
-                      title: Text(game.name ?? 'Nema ime'),
+                      title: Text(
+                        (game.name?.trim().isNotEmpty ?? false) ? game.name! : '<nema ime>',
+                        style: (game.name?.trim().isNotEmpty ?? false)
+                            ? TextStyle(fontSize: 16, color: Colors.black)
+                            : TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
+                      ),
                       subtitle: Text(
-                          '''Date: ${game.dateToString()}\n
-                             Players: $playerNames'''
+                          '''Datum: ${game.dateToString()}\nIgrači: $playerNames'''
                       ),
                       trailing: Icon(
-                        game.isFinished ? Icons.check_circle : Icons.cancel,
-                        color: game.isFinished ? Colors.green : Colors.red,
+                        game.isFinished ? Icons.check_circle : Icons.access_time,
+                        color: game.isFinished ? Colors.green : Colors.orange,
                       ),
                       onTap: () {
 
@@ -127,8 +145,8 @@ class _HomePageState extends State<Homepage> {
                           'Date: ${game.dateToString()}'
                       ),
                       trailing: Icon(
-                        game.isFinished ? Icons.check_circle : Icons.cancel,
-                        color: game.isFinished ? Colors.green : Colors.red,
+                        game.isFinished ? Icons.check_circle : Icons.access_time,
+                        color: game.isFinished ? Colors.green : Colors.orange,
                       ),
                       onTap: () {
 

@@ -33,13 +33,13 @@ class Round implements BaseModel<Round>{
 
   factory Round.fromMap(Map<String, dynamic> map) {
     return Round(
-      id: map['id'] as int,
-      gameId: map['gameId'] as int,
-      roundNumber: map['roundNumber'] as int,
-      callerId: map['callerId'] as int,
-      calledGame: map['calledGame'] as int,
-      isIgra: map['isIgra'] as bool,
-      multiplier: map['multiplier'] as int,
+      id: map['id'],
+      gameId: map['gameId'],
+      roundNumber: map['roundNumber'],
+      callerId: map['callerId'],
+      calledGame: map['calledGame'],
+      isIgra: map['isIgra'] == 1,
+      multiplier: map['multiplier'],
     );
   }
 

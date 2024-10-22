@@ -8,6 +8,10 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
   bool refeLeft;
   bool refeRight;
   bool? refeRight2;
+  int totalScore;
+  int leftSoupTotal;
+  int rightSoupTotal;
+  int? rightSoupTotal2;
 
   ScoreSheet({
     this.id,
@@ -17,34 +21,48 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
     this.refeLeft = false,
     this.refeRight = false,
     this.refeRight2,
+    required this.totalScore,
+    this.leftSoupTotal = 0,
+    this.rightSoupTotal = 0,
+    this.rightSoupTotal2
   });
+
+
+
+  @override
+  ScoreSheet fromMap(Map<String, dynamic> map) {
+    return ScoreSheet.fromMap(map);
+  }
 
   Map<String, dynamic> toMap() {
     return {
-      'Id': id,
-      'PlayerId': playerId,
-      'GameId': gameId,
-      'refe': refe ? 1 : 0,
-      'refeLeft': refeLeft ? 1 : 0,
-      'refeRight': refeRight ? 1 : 0,
-      'refeRight2': refeRight2 == null ? null : (refeRight2! ? 1 : 0),
+      'id': this.id,
+      'playerId': this.playerId,
+      'gameId': this.gameId,
+      'refe': this.refe,
+      'refeLeft': this.refeLeft,
+      'refeRight': this.refeRight,
+      'refeRight2': this.refeRight2,
+      'totalScore': this.totalScore,
+      'leftSoupTotal': this.leftSoupTotal,
+      'rightSoupTotal': this.rightSoupTotal,
+      'rightSoupTotal2': this.rightSoupTotal2,
     };
   }
 
   factory ScoreSheet.fromMap(Map<String, dynamic> map) {
     return ScoreSheet(
-      id: map['Id'] as int,
-      playerId: map['PlayerId'] as int,
-      gameId: map['GameId'] as int,
+      id: map['id'],
+      playerId: map['playerId'],
+      gameId: map['gameId'],
       refe: map['refe'] == 1,
       refeLeft: map['refeLeft'] == 1,
       refeRight: map['refeRight'] == 1,
-      refeRight2: map['refeRight2'] == null ? null : map['refeRight2'] == 1,
+      refeRight2: map['refeRight2'] == 1,
+      totalScore: map['totalScore'],
+      leftSoupTotal: map['leftSoupTotal'],
+      rightSoupTotal: map['rightSoupTotal'],
+      rightSoupTotal2: map['rightSoupTotal2'],
     );
-  }
-
-  @override
-  ScoreSheet fromMap(Map<String, dynamic> map) {
-    return ScoreSheet.fromMap(map);
   }
 }

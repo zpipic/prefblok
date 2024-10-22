@@ -41,7 +41,7 @@ class _AddPlayerDialogState extends State<AddPlayerDialog>{
 
     String name = _nameController.text.trim();
 
-    if (widget.player == null) {
+    if (widget.player == null || widget.player!.id == null) {
       // Adding a new player
       Player newPlayer = Player(name: name);
       int? playerId = await dbHelper.insertPlayer(newPlayer);
@@ -77,7 +77,7 @@ class _AddPlayerDialogState extends State<AddPlayerDialog>{
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.player == null ? 'Dodavanje novog igrača' : 'Uređivanje imena igrača'),
+      title: Text((widget.player == null || widget.player!.id == null) ? 'Dodavanje novog igrača' : 'Uređivanje imena igrača'),
       content: Form(
         key: _formKey,
         child: Column(

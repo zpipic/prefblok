@@ -33,13 +33,13 @@ class RoundScore implements BaseModel<RoundScore>{
 
   factory RoundScore.fromMap(Map<String, dynamic> map) {
     return RoundScore(
-      id: map['id'] as int,
-      roundId: map['roundId'] as int,
-      scoreSheetId: map['scoreSheetId'] as int,
-      score: map['score'] as int,
-      leftSoup: map['leftSoup'] as int,
-      rightSoup: map['rightSoup'] as int,
-      rightSoup2: map['rightSoup2'] as int,
+      id: map['id'],
+      roundId: map['roundId'],
+      scoreSheetId: map['scoreSheetId'],
+      score: map['score'],
+      leftSoup: map['leftSoup'],
+      rightSoup: map['rightSoup'],
+      rightSoup2: map['rightSoup2'],
     );
   }
 

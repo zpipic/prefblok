@@ -22,7 +22,7 @@ class Game implements BaseModel<Game>{
     return {
       'id': id,
       'name': name,
-      'date': date,
+      'date': dateToString(),
       'noOfPlayers': noOfPlayers,
       'isFinished': isFinished ? 1 : 0,
       'startingScore': startingScore,
@@ -31,17 +31,21 @@ class Game implements BaseModel<Game>{
 
   factory Game.fromMap(Map<String, dynamic> map) {
     return Game(
-      id: map['id'] as int,
-      name: map['name'] as String,
-      date: map['date'] as DateTime,
-      noOfPlayers: map['noOfPlayers'] as int,
-      isFinished: map['isFinished'] as bool,
-      startingScore: map['startingScore'] as int,
+      id: map['id'],
+      name: map['name'],
+      date: stringToDate(map['date']),
+      noOfPlayers: map['noOfPlayers'],
+      isFinished: map['isFinished'] == 1,
+      startingScore: map['startingScore'],
     );
   }
 
   String dateToString(){
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  }
+
+  static stringToDate(String dateString){
+    return DateFormat('dd/MM/yyyy HH:mm').parse(dateString);
   }
 
   @override

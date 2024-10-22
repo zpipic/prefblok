@@ -44,7 +44,8 @@ class DatabaseHelper{
             name TEXT,
             date TEXT,
             noOfPlayers INTEGER,
-            isFinished INTEGER DEFAULT 0
+            isFinished INTEGER DEFAULT 0,
+            startingScore INTEGER
           )
         ''');
 
@@ -57,6 +58,10 @@ class DatabaseHelper{
             refeLeft INTEGER DEFAULT 0,
             refeRight INTEGER DEFAULT 0,
             refeRight2 INTEGER,
+            totalScore INTEGER,
+            leftSoupTotal INTEGER DEFAULT 0,
+            rightSoupTotal INTEGER DEFAULT 0,
+            rightSoupTotal2 INTEGER,
             FOREIGN KEY(gameId) REFERENCES games(id) ON DELETE CASCADE,
             FOREIGN KEY(playerId) REFERENCES players(id) ON DELETE CASCADE
           )

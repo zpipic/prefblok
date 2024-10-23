@@ -1,6 +1,7 @@
 import 'package:pref_blok/database/game_queries.dart';
 import 'package:pref_blok/database/scoresheet_queries.dart';
-
+import 'package:pref_blok/screens/add_round_page.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../models/models.dart';
 import '../database/database_helper.dart';
 import 'package:flutter/material.dart';
@@ -15,9 +16,10 @@ class GameScreen extends StatefulWidget{
 }
 
 class _GameScreenState extends State<GameScreen>{
-  final DatabaseHelper dbHelper = DatabaseHelper();
-  final GameQueries gameQueries = GameQueries();
-  final ScoreSheetQueries scoreSheetQueries = ScoreSheetQueries();
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final GameQueries _gameQueries = GameQueries();
+  final ScoreSheetQueries _scoreSheetQueries = ScoreSheetQueries();
+  final PageController _pageController = new PageController();
 
   bool _isLoading = true;
 
@@ -45,28 +47,28 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   Future<void> _loadRounds() async{
-    final rounds = await gameQueries.getRoundsGame(widget.game.id!);
+    final rounds = await _gameQueries.getRoundsGame(widget.game.id!);
     setState(() {
       _rounds = rounds;
     });
   }
 
   Future<void> _loadPlayers() async{
-    final players = await gameQueries.getPlayersInGame(widget.game.id);
+    final players = await _gameQueries.getPlayersInGame(widget.game.id);
     setState(() {
       _players = players;
     });
   }
 
   Future<void> _loadScoreSheets() async {
-    final scoreSheets = await gameQueries.getScoreSheetsGame(widget.game.id);
+    final scoreSheets = await _gameQueries.getScoreSheetsGame(widget.game.id);
     setState(() {
       _scoreSheets = scoreSheets;
     });
   }
 
   Future<void> _loadRoundScores() async {
-    final scores = await scoreSheetQueries.getRoundScoresGame(widget.game.id!);
+    final scores = await _scoreSheetQueries.getRoundScoresGame(widget.game.id!);
     setState(() {
       _roundScores = scores;
     });
@@ -85,7 +87,23 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   void _addRound(){
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) =>
+          AddRoundPage(
+              game: widget.game,
+              scoreSheets: _scoreSheets,
+              players: _players,
+          ),
+      )
+    );
+  }
 
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -111,10 +129,34 @@ class _GameScreenState extends State<GameScreen>{
             ),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: _buildTablesBody(),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: SmoothPageIndicator(
+                  controller: _pageController,
+                  count: widget.game.noOfPlayers,
+                effect: const WormEffect(
+                  dotHeight: 8.0,
+                  dotWidth: 8.0,
+                  activeDotColor: Colors.indigo,
+                  dotColor: Colors.grey,
+                ),
+              ),
+            ),
+            Expanded(
+                child:
+                  PageView.builder(
+                  controller: _pageController,
+                  itemCount: widget.game.noOfPlayers,
+                  itemBuilder: (context, index) {
+                    return _buildTable(_scoreSheets[index]);
+                  },
+                )
+            ),
+          ],
         ),
+
         floatingActionButton: FloatingActionButton(
           onPressed: _addRound,
           tooltip: 'Nova runda',
@@ -156,10 +198,10 @@ class _GameScreenState extends State<GameScreen>{
         return Container(
           width: width,
           height: height,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
+          // decoration: BoxDecoration(
+          //   border: Border.all(color: Colors.grey),
+          //   borderRadius: BorderRadius.circular(8.0),
+          // ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -173,6 +215,16 @@ class _GameScreenState extends State<GameScreen>{
               Expanded(
                 child: SingleChildScrollView(
                   child: DataTable(
+                    border: const TableBorder(
+                      verticalInside: BorderSide(
+                        width: 1,
+                        style: BorderStyle.solid,
+                      ),
+                      horizontalInside: BorderSide(
+                        width: 1,
+                        style: BorderStyle.solid,
+                      )
+                    ),
                     columns: _buildColumns(scoreSheet.position),
                     rows: [],
                   ),
@@ -190,19 +242,32 @@ class _GameScreenState extends State<GameScreen>{
     int left = ((position - 1) % n + n) % n;
     int right = (position + 1) % n;
     List<DataColumn> columns = [
-      DataColumn(label: Text('${_players[left].name} juhe')),
-      const DataColumn(label: Text('Bule')),
-      DataColumn(label: Text('${_players[right].name} juhe')),
+      _buildDataColumn('${_players[left].name} juhe'),
+      _buildDataColumn('Bule'),
+      _buildDataColumn('${_players[right].name} juhe'),
     ];
 
     if (n == 4){
       int right2 = (position + 2) % n;
       columns.add(
-        DataColumn(label: Text('${_players[right2].name} juhe')),
+        _buildDataColumn('${_players[right2].name} juhe'),
       );
     }
 
     return columns;
+  }
+
+  DataColumn _buildDataColumn(String text){
+    return DataColumn(
+        label: Flexible(
+          child: Text(
+            text,
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 3,
+          ),
+        )
+    );
   }
 
 

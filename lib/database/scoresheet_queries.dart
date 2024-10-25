@@ -31,7 +31,7 @@ class ScoreSheetQueries{
     String placeholders = List.filled(ids.length, '?').join(',');
 
     List<Map<String, dynamic>> data = await db.rawQuery(
-      'SELECT * from roundScores WHERE scoreSheetId IN (${placeholders})',
+      'SELECT * from roundScores WHERE scoreSheetId IN ($placeholders)',
       ids
     );
 

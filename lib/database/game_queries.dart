@@ -1,9 +1,11 @@
+import 'package:pref_blok/database/base_query.dart';
+
 import 'database_helper.dart';
 import '../models/models.dart';
 import '../utils/db_utils.dart';
 
-class GameQueries {
-  final DatabaseHelper dbHelper = DatabaseHelper();
+class GameQueries extends BaseQuery{
+  final tableName = 'games';
 
   Future <List<Round>> getRoundsGame(int gameId) async{
     final db = await dbHelper.database;
@@ -54,5 +56,10 @@ class GameQueries {
     }
 
     return players;
+  }
+
+  Future<Game?> getById(int id) async {
+    var data = await super.getByIdBase(tableName, 'id', id);
+    return data != null ? Game.fromMap(data) : null;
   }
 }

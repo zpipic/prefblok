@@ -1,3 +1,4 @@
+import 'package:pref_blok/database/player_queries.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../utils/db_utils.dart';
@@ -126,6 +127,12 @@ class DatabaseHelper{
 
   Future<int> deletePlayer(int id) async {
     final db = await database;
+    final PlayerQueries playerQueries = PlayerQueries();
+
+    var games = await playerQueries.getGames(id);
+    for (var game in games){
+      await deleteGame(game.id!);
+    }
     return await db.delete('players', where: 'id = ?', whereArgs: [id]);
   }
 

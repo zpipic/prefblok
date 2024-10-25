@@ -50,7 +50,7 @@ class _PlayersListPageState extends State<PlayersListPage>{
     bool? confirmDelete = await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Brisanje igrača'),
+          title: const Text('Brisanje igrača'),
           content: Text('Obrisati igrača "${player.name}" i sve povezane partije?'),
           actions: [
             TextButton(

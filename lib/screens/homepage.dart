@@ -114,7 +114,7 @@ class _HomePageState extends State<Homepage> {
     bool? confirmDelete = await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Brisanje partije'),
+          title: const Text('Brisanje partije'),
           content: Text('Obrisati partiju "${game.name}"?'),
           actions: [
             TextButton(
@@ -158,7 +158,7 @@ class _HomePageState extends State<Homepage> {
                 future: gameQueries.getPlayersInGame(game.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting){
-                    return Center(
+                    return const Center(
                       child: CircularProgressIndicator(),
                     );
                   }
@@ -173,8 +173,8 @@ class _HomePageState extends State<Homepage> {
                       title: Text(
                         (game.name?.trim().isNotEmpty ?? false) ? game.name! : '<nema ime>',
                         style: (game.name?.trim().isNotEmpty ?? false)
-                            ? TextStyle(fontSize: 16, color: Colors.black)
-                            : TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
+                            ? const TextStyle(fontSize: 16, color: Colors.black)
+                            : const TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
                       ),
                       subtitle: Text(
                           '''Datum: ${game.dateToString()}\nIgrači: $playerNames'''

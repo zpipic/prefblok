@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:pref_blok/database/database_helper.dart';
 import 'package:pref_blok/database/game_queries.dart';
 import '../models/models.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'add_player_dialog.dart';
 import '../database/player_queries.dart';
 
@@ -28,15 +27,15 @@ class _NewGameDialogState extends State<NewGameDialog> {
   final _startScoreController = TextEditingController();
   final List<TextEditingController> _playerControllers = List.generate(4, (_) => TextEditingController());
   final ScrollController _scrollController = ScrollController();
-  List<FocusNode> _dropdownFocusNodes = List.generate(4, (index) => FocusNode());
+  final List<FocusNode> _dropdownFocusNodes = List.generate(4, (index) => FocusNode());
 
   final DatabaseHelper dbHelper = DatabaseHelper();
   final PlayerQueries playerQueries = PlayerQueries();
   final GameQueries gameQueries = GameQueries();
 
   List<Player> _players = [];
-  List<Player?> _selectedPlayers = List.filled(4, null);
-  List<Player> _placeholderPlayers = List.generate(4, (_) => Player(name: ''));
+  final List<Player?> _selectedPlayers = List.filled(4, null);
+  final List<Player> _placeholderPlayers = List.generate(4, (_) => Player(name: ''));
   List<bool> _dropdownValid = List.filled(4, true);
 
   int _noOfPlayers =  3;
@@ -48,7 +47,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
     for (int i = 0; i < _playerControllers.length; i++){
       _playerControllers[i].addListener( () {
           setState(() {
-            _selectedPlayers[i] = new Player(name: _playerControllers[i].text);
+            _selectedPlayers[i] = Player(name: _playerControllers[i].text);
             _dropdownValid = List.filled(4, true);
           });
         }
@@ -79,7 +78,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
     bool valid = true;
     for (int i = 0; i < _noOfPlayers; i++){
       if (_selectedPlayers[i] != null){
-        _selectedPlayers[i] = await playerQueries.GetPlayerByName(_selectedPlayers[i]!.name);
+        _selectedPlayers[i] = await playerQueries.getPlayerByName(_selectedPlayers[i]!.name);
       }
       if (_selectedPlayers[i] == null || _selectedPlayers[i]!.id == null){
         setState(() {
@@ -308,7 +307,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'Igrač ${i+1} nije odabran',
-                                    style: TextStyle(color: Colors.red, fontSize: 12.0),
+                                    style: const TextStyle(color: Colors.red, fontSize: 12.0),
                                   )
                                 ),
                             ]),
@@ -349,7 +348,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
                       const SizedBox(width: 8.0,),
                       ElevatedButton(
                         onPressed: _saveGame,
-                        child: Text('Spremi'),
+                        child: const Text('Spremi'),
                       ),
                     ],
                   )

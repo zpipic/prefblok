@@ -5,6 +5,8 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../models/models.dart';
 import '../database/database_helper.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GameScreen extends StatefulWidget{
   Game game;
@@ -19,7 +21,7 @@ class _GameScreenState extends State<GameScreen>{
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final GameQueries _gameQueries = GameQueries();
   final ScoreSheetQueries _scoreSheetQueries = ScoreSheetQueries();
-  final PageController _pageController = new PageController();
+  final PageController _pageController = PageController();
 
   bool _isLoading = true;
 
@@ -27,12 +29,47 @@ class _GameScreenState extends State<GameScreen>{
   List<Player> _players = [];
   List<ScoreSheet> _scoreSheets = [];
   List<RoundScore> _roundScores = [];
+  int _shuffler = 0;
   // Map<int, List<RoundScore>> _roundScores = {};
 
   @override
   void initState(){
     _initData();
+    _loadShuffler();
     super.initState();
+  }
+
+  void _loadShuffler() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int? storedShuffler = prefs.getInt('shuffler_${widget.game.id}');
+
+    if (storedShuffler == null){
+      setState(() {
+        _shuffler = Random().nextInt(widget.game.noOfPlayers);
+      });
+      await _saveShuffler();
+    } else {
+      setState(() {
+        _shuffler = storedShuffler;
+      });
+    }
+  }
+
+  _deleteShuffler() async{
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.remove('shuffler_${widget.game.id}');
+  }
+
+  Future<void> _saveShuffler() async{
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setInt('shuffler_${widget.game.id}', _shuffler);
+  }
+
+  void _incrementShuffler(){
+    setState(() {
+      _shuffler = (_shuffler + 1) % widget.game.noOfPlayers;
+    });
+    _saveShuffler();
   }
 
   void _initData() async{
@@ -87,13 +124,19 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   void _addRound(){
+    List<Player> playersPlaying = List.from(_players);
+    if (widget.game.noOfPlayers == 4){
+      playersPlaying.removeAt(_shuffler);
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) =>
           AddRoundPage(
               game: widget.game,
               scoreSheets: _scoreSheets,
-              players: _players,
+              players: playersPlaying,
+              roundNumber: _rounds.length + 1,
+              shuffler: _shuffler,
           ),
       )
     );
@@ -131,6 +174,20 @@ class _GameScreenState extends State<GameScreen>{
         ),
         body: Column(
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.shuffle),
+                const SizedBox(width: 5,),
+                Text(
+                  _players[_shuffler].name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16,),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: SmoothPageIndicator(
@@ -195,7 +252,7 @@ class _GameScreenState extends State<GameScreen>{
 
         List<RoundScore> scores = _getScoresSheet(scoreSheet.id!);
 
-        return Container(
+        return SizedBox(
           width: width,
           height: height,
           // decoration: BoxDecoration(
@@ -226,7 +283,7 @@ class _GameScreenState extends State<GameScreen>{
                       )
                     ),
                     columns: _buildColumns(scoreSheet.position),
-                    rows: [],
+                    rows: const [],
                   ),
                 ),
               )

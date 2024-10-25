@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:pref_blok/database/database_helper.dart';
 import '../models/models.dart';
-import '../database/database_helper.dart';
+import '../enums/player_position.dart';
 
 class AddRoundPage extends StatefulWidget{
   Game game;
   List<ScoreSheet> scoreSheets;
   List<Player> players;
   Round? existingRound;
-
+  int roundNumber;
+  int shuffler;
 
   AddRoundPage({
     required this.game,
     required this.scoreSheets,
     super.key,
     this.existingRound,
-    required this.players
+    required this.players,
+    required this.roundNumber,
+    required this.shuffler,
   });
 
   @override
@@ -25,11 +29,89 @@ class _AddRoundPageState extends State<AddRoundPage>{
   int _selectedCaller = -1;
   List<bool> _played = List.filled(3, true);
   int _selectedContract = 0;
-  List<TextEditingController> _pointsControllers = List.generate(3, (_) => TextEditingController());
+  final List<TextEditingController> _pointsControllers = List.generate(3, (_) => TextEditingController());
   bool _isGame = false;
+  int _multiplier = 1;
+
+  final DatabaseHelper _dbHelper = DatabaseHelper();
 
   final _cardColors = {'pik': 2, 'karo': 3, 'herc': 4, 'tref': 5};
   final _otherGames = {'betl': 6, 'sans': 7, 'dalje': 0};
+  final kontre = {'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
+
+  void _saveGame(){
+    _multiplier = _multiplier*2;
+
+    Round round = Round(
+      gameId: widget.game.id!,
+      roundNumber: widget.roundNumber,
+      callerId: _selectedCaller >= 0 ? widget.players[_selectedCaller].id! : null,
+      isIgra: _isGame,
+      multiplier: _multiplier,
+    );
+
+    if (_selectedContract == 0){
+      for (var scoreSheet in widget.scoreSheets){
+        scoreSheet.refe = true;
+        if (widget.game.noOfPlayers == 3){
+          scoreSheet.refeRight = true;
+          scoreSheet.refeLeft = true;
+        }
+        else{
+          switch(scoreSheet.position - widget.shuffler){
+            case 3:
+            case -1:
+              scoreSheet.refeLeft = true;
+              scoreSheet.refeRight2 = true;
+              break;
+            case -2:
+            case 2:
+              scoreSheet.refeLeft = true;
+              scoreSheet.refeRight = true;
+              break;
+            case -3:
+            case 1:
+              scoreSheet.refeRight = true;
+              scoreSheet.refeRight2 = true;
+              break;
+          }
+        }
+
+        _dbHelper.updateScoreSheet(scoreSheet);
+      }
+    }
+
+    var caller = widget.players[_selectedCaller];
+    var callerScoreSheet = getScoreSheet(caller.id!);
+
+    if (callerScoreSheet.refe){
+      round.multiplier = round.multiplier*2;
+      for (var scoreSheet in widget.scoreSheets){
+        var position = PlayerPosition.getRelativePosition(scoreSheet.position,
+            callerScoreSheet.position, widget.game.noOfPlayers);
+
+        switch (position){
+          case PlayerPosition.left:
+            scoreSheet.refeLeft = false;
+            break;
+          case PlayerPosition.right:
+            scoreSheet.refeRight = false;
+            break;
+          case PlayerPosition.right2:
+            scoreSheet.refeRight2 = false;
+            break;
+          default:
+            break;
+        }
+
+        _dbHelper.updateScoreSheet(scoreSheet);
+      }
+    }
+  }
+
+  ScoreSheet getScoreSheet(int playerId){
+    return widget.scoreSheets.firstWhere((x) => x.playerId == playerId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +128,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
               const Text('Štihovi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
               const SizedBox(height: 16.0,),
               const Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: EdgeInsets.only(bottom: 8.0),
                 child: Row(
                   children: [
                     SizedBox(width:  5,),
@@ -103,10 +185,17 @@ class _AddRoundPageState extends State<AddRoundPage>{
         Radio(
           value: index,
           groupValue: _selectedCaller,
+          toggleable: true,
           onChanged: (value) {
+            int caller = value ?? -1;
             setState(() {
-              _selectedCaller = value as int;
-              _played[index] = true;
+              _selectedCaller = caller;
+              if (caller != -1){
+                _played[index] = true;
+              } else{
+                _selectedContract = 0;
+                _played = List.filled(_played.length, false);
+              }
             });
           },
         ),
@@ -177,6 +266,18 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
         const SizedBox(height: 16,),
         _isGameWidget(),
+
+        const SizedBox(height: 16,),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var kontra in kontre.entries)
+              _kontraWidget(kontra.key, kontra.value),
+          ],
+        ),
       ],
     );
   }
@@ -212,12 +313,12 @@ class _AddRoundPageState extends State<AddRoundPage>{
                     ],
                 ) : null,
               child: Image.asset(
-                'assets/karte/${color}.png',
+                'assets/karte/$color.png',
                 fit: BoxFit.contain,
               ),
             ),
 
-            Text('(${value + (_isGame ? 1 : 0)})'),
+            Text('(${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
           ],
         ),
       ),
@@ -259,7 +360,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
                 )
                 ] : null,
           ),
-          child: Text('$game (${value + (_isGame && value != 0 ? 1 : 0)})'),
+          child: Text('$game (${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
         ),
       )
     );
@@ -279,6 +380,43 @@ class _AddRoundPageState extends State<AddRoundPage>{
         ),
         const Text('Igra?'),
       ],
+    );
+  }
+
+  Widget _kontraWidget(String kontra, int value){
+    return GestureDetector(
+        onTap: () {
+          setState(() {
+            _multiplier = _multiplier != value ? value : 1;
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _multiplier == value
+                    ? Colors.blue
+                    : Colors.grey,
+                width: _multiplier == value
+                    ? 2
+                    : 1,
+              ),
+              borderRadius: BorderRadius.circular(8.0),
+              boxShadow: _multiplier == value
+                  ? [
+                const BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 6,
+                  spreadRadius: 2,
+                  offset: Offset(0, 3),
+                )
+              ] : null,
+            ),
+            child: Text('$kontra (x$value)'),
+          ),
+        )
     );
   }
 }

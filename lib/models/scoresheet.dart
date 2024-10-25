@@ -38,18 +38,18 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
 
   Map<String, dynamic> toMap() {
     return {
-      'id': this.id,
-      'playerId': this.playerId,
-      'gameId': this.gameId,
-      'refe': this.refe ? 1 : 0,
-      'refeLeft': this.refeLeft ? 1 : 0,
-      'refeRight': this.refeRight ? 1 : 0,
+      'id': id,
+      'playerId': playerId,
+      'gameId': gameId,
+      'refe': refe ? 1 : 0,
+      'refeLeft': refeLeft ? 1 : 0,
+      'refeRight': refeRight ? 1 : 0,
       'refeRight2': refeRight2 != null ? (refeRight2! ? 1 : 0) : null,
-      'totalScore': this.totalScore,
-      'leftSoupTotal': this.leftSoupTotal,
-      'rightSoupTotal': this.rightSoupTotal,
-      'rightSoupTotal2': this.rightSoupTotal2,
-      'position': this.position,
+      'totalScore': totalScore,
+      'leftSoupTotal': leftSoupTotal,
+      'rightSoupTotal': rightSoupTotal,
+      'rightSoupTotal2': rightSoupTotal2,
+      'position': position,
     };
   }
 

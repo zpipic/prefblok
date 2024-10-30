@@ -4,19 +4,21 @@ class RoundScore implements BaseModel<RoundScore>{
   int? id;
   int roundId; //foreign
   int scoreSheetId; // foreign
-  int score;
-  int leftSoup;
-  int rightSoup;
+  int? score;
+  int? leftSoup;
+  int? rightSoup;
   int? rightSoup2;
+  int? totalScore;
 
   RoundScore({
     this.id,
     required this.roundId,
     required this.scoreSheetId,
-    this.score = 0,
-    this.leftSoup = 0,
-    this.rightSoup = 0,
+    this.score,
+    this.leftSoup,
+    this.rightSoup,
     this.rightSoup2,
+    this.totalScore,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +30,7 @@ class RoundScore implements BaseModel<RoundScore>{
       'leftSoup': leftSoup,
       'rightSoup': rightSoup,
       'rightSoup2': rightSoup2,
+      'totalScore': totalScore,
     };
   }
 
@@ -40,6 +43,7 @@ class RoundScore implements BaseModel<RoundScore>{
       leftSoup: map['leftSoup'],
       rightSoup: map['rightSoup'],
       rightSoup2: map['rightSoup2'],
+      totalScore: map['totalScore'],
     );
   }
 

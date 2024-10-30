@@ -1,5 +1,6 @@
 import 'package:pref_blok/database/game_queries.dart';
 import 'package:pref_blok/database/scoresheet_queries.dart';
+import 'package:pref_blok/enums/player_position.dart';
 import 'package:pref_blok/screens/add_round_page.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../models/models.dart';
@@ -7,6 +8,7 @@ import '../database/database_helper.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 class GameScreen extends StatefulWidget{
   Game game;
@@ -29,8 +31,11 @@ class _GameScreenState extends State<GameScreen>{
   List<Player> _players = [];
   List<ScoreSheet> _scoreSheets = [];
   List<RoundScore> _roundScores = [];
+  Map<int, List<RoundScore>> _roundScoresSheet = {};
   int _shuffler = 0;
   // Map<int, List<RoundScore>> _roundScores = {};
+
+  int _totalSum = 0;
 
   @override
   void initState(){
@@ -40,6 +45,8 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   void _loadShuffler() async {
+    //await _deleteShuffler();
+
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int? storedShuffler = prefs.getInt('shuffler_${widget.game.id}');
 
@@ -72,15 +79,31 @@ class _GameScreenState extends State<GameScreen>{
     _saveShuffler();
   }
 
+  void _setTotalSum(){
+    _totalSum = 0;
+    for (var scoreSheet in _scoreSheets){
+      _totalSum += scoreSheet.totalScore;
+    }
+  }
+
   void _initData() async{
     await _loadRounds();
     await _loadPlayers();
     await _loadScoreSheets();
     await _loadRoundScores();
+    _setTotalSum();
+
+    for (var scoreSheet in _scoreSheets){
+      _roundScoresSheet[scoreSheet.id!] = [];
+    }
+
+    _loadRoundScoreSheets();
 
     setState(() {
       _isLoading = false;
     });
+
+    _checkGameOver();
   }
 
   Future<void> _loadRounds() async{
@@ -111,8 +134,20 @@ class _GameScreenState extends State<GameScreen>{
     });
   }
 
+  void _loadRoundScoreSheets() {
+    for (var roundScore in _roundScores){
+      setState(() {
+        _roundScoresSheet[roundScore.scoreSheetId]?.add(roundScore);
+      });
+    }
+  }
+
   List<RoundScore> _getScoresRound(int roundId){
     return _roundScores.where((x) => x.roundId == roundId).toList();
+  }
+
+  RoundScore? _getRoundScore(int roundId, int scoreSheetId){
+    return _roundScoresSheet[scoreSheetId]?.firstWhere((x) => x.roundId == roundId);
   }
 
   List<RoundScore> _getScoresSheet(int scoreSheetId){
@@ -125,23 +160,123 @@ class _GameScreenState extends State<GameScreen>{
 
   void _addRound(){
     List<Player> playersPlaying = List.from(_players);
+    List<ScoreSheet> activeScoresheets = List.from(_scoreSheets);
     if (widget.game.noOfPlayers == 4){
       playersPlaying.removeAt(_shuffler);
+      activeScoresheets.removeAt(_shuffler);
     }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) =>
           AddRoundPage(
               game: widget.game,
-              scoreSheets: _scoreSheets,
+              scoreSheets: activeScoresheets,
               players: playersPlaying,
               roundNumber: _rounds.length + 1,
               shuffler: _shuffler,
+              onRoundCreated: onRoundAdded,
+              maxContract: _totalSum.abs(),
           ),
       )
     );
   }
 
+  void _checkGameOver() async{
+    if (_totalSum != 0){
+      return;
+    }
+
+    widget.game.isFinished = true;
+    await _dbHelper.updateGame(widget.game);
+
+    var scores = _calculatePlayerScores();
+    Player winner = scores.entries
+      .reduce((a, b) => a.value > b.value ? a : b)
+      .key;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Gotova partija'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Pobjednik: ${winner.name}'),
+              SizedBox(height: 10,),
+              Text('Rezultati:'),
+              ...scores.entries.map((entry) => Text("${entry.key.name}: ${entry.value}")),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: (){
+                Navigator.of(context).pop();
+              },
+              child: const Text('Povratak')
+            ),
+            FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pop(context);
+              },
+              child:const Text("OK"),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  Map<Player, int> _calculatePlayerScores(){
+    Map<Player, int> scores = {};
+    for (var scoreSheet in _scoreSheets){
+      int score = scoreSheet.totalScore * 10 +
+          scoreSheet.rightSoupTotal +
+          scoreSheet.leftSoupTotal +
+          (scoreSheet.rightSoupTotal2 ?? 0);
+
+      for (var otherSheet in _scoreSheets){
+        var position = PlayerPosition.getRelativePosition(otherSheet.position,
+            scoreSheet.position, widget.game.noOfPlayers);
+        switch (position){
+          case PlayerPosition.left:
+            score -= otherSheet.leftSoupTotal;
+            break;
+          case PlayerPosition.right:
+            score -= otherSheet.rightSoupTotal;
+            break;
+          case PlayerPosition.right2:
+            score -= otherSheet.rightSoupTotal2!;
+            break;
+          default:
+            break;
+        }
+      }
+
+      scores[_getPlayer(scoreSheet.playerId)] = score;
+    }
+
+    return scores;
+  }
+
+  void onRoundAdded(Round round, List<RoundScore> scores) async{
+    await _loadScoreSheets();
+    setState((){
+      _setTotalSum();
+      _rounds.add(round);
+      _incrementShuffler();
+    });
+
+    for (var score in scores){
+      setState(() {
+        _roundScores.add(score);
+        _roundScoresSheet[score.scoreSheetId]?.add(score);
+      });
+    }
+
+    _checkGameOver();
+  }
 
   @override
   void dispose() {
@@ -181,6 +316,19 @@ class _GameScreenState extends State<GameScreen>{
                 const SizedBox(width: 5,),
                 Text(
                   _players[_shuffler].name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.functions_rounded),
+                const SizedBox(width: 5,),
+                Text(
+                  _totalSum.toString(),
                   style: const TextStyle(
                     fontSize: 14,
                   ),
@@ -265,25 +413,50 @@ class _GameScreenState extends State<GameScreen>{
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  _getPlayer(scoreSheet.playerId).name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0),
+                  _getPlayer(scoreSheet.playerId).name.toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
                 ),
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  child: DataTable(
-                    border: const TableBorder(
-                      verticalInside: BorderSide(
-                        width: 1,
-                        style: BorderStyle.solid,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Table(
+                      border: const TableBorder(
+                        verticalInside: BorderSide(
+                          width: 2,
+                          style: BorderStyle.solid,
+                          color: Colors.grey,
+                        ),
                       ),
-                      horizontalInside: BorderSide(
-                        width: 1,
-                        style: BorderStyle.solid,
-                      )
+                      children: [
+                        TableRow(
+                          children: _buildHeader(scoreSheet.position),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey,
+                                width: 4,
+                              ),
+                            )
+                          ),
+                        ),
+                        _buildFirsRow(),
+                        for (int i = 0; i < _roundScoresSheet[scoreSheet.id]!.length; i++)
+                          ...[
+                            if (i > 0)
+                              if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) < 0 &&
+                                  (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) >= 0)
+                                _hatRow()
+                              else if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) > 0 &&
+                                  (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) <= 0)
+                                _hatRow(reverse: true),
+                            _roundScoreToRow(_roundScoresSheet[scoreSheet.id]![i]),
+                          ],
+                        _dividerRow(),
+                        _sumsRow(scoreSheet),
+                      ],
                     ),
-                    columns: _buildColumns(scoreSheet.position),
-                    rows: const [],
                   ),
                 ),
               )
@@ -294,38 +467,120 @@ class _GameScreenState extends State<GameScreen>{
     );
   }
 
-  List<DataColumn> _buildColumns(int position) {
+  List<TableCell> _buildHeader(int position) {
     int n = widget.game.noOfPlayers;
     int left = ((position - 1) % n + n) % n;
     int right = (position + 1) % n;
-    List<DataColumn> columns = [
-      _buildDataColumn('${_players[left].name} juhe'),
-      _buildDataColumn('Bule'),
-      _buildDataColumn('${_players[right].name} juhe'),
+    List<TableCell> columns = [
+      _buildDataCell('${_players[left].name} juhe'),
+      _buildDataCell('Bule'),
+      _buildDataCell('${_players[right].name} juhe'),
     ];
 
     if (n == 4){
       int right2 = (position + 2) % n;
       columns.add(
-        _buildDataColumn('${_players[right2].name} juhe'),
+        _buildDataCell('${_players[right2].name} juhe'),
       );
     }
 
     return columns;
   }
 
-  DataColumn _buildDataColumn(String text){
-    return DataColumn(
-        label: Flexible(
+  TableRow _buildFirsRow(){
+    return TableRow(
+      children: [
+        const Text(''),
+        _buildDataCell(widget.game.startingScore.abs().toString()),
+        const Text(''),
+        if (widget.game.noOfPlayers == 4)
+          const Text(''),
+      ],
+    );
+  }
+
+  TableCell _buildDataCell(String text){
+    return TableCell(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Center(
           child: Text(
             text,
             softWrap: true,
             overflow: TextOverflow.ellipsis,
             maxLines: 3,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
-        )
+        ))
     );
   }
 
+  TableRow? _roundScoreToRowIds(Round round, ScoreSheet scoreSheet){
+    var score = _getRoundScore(round.id!, scoreSheet.id!);
+    if (score == null) return null;
 
+    return _roundScoreToRow(score);
+  }
+
+  TableRow _roundScoreToRow(RoundScore score,){
+    return TableRow(
+        children: [
+          _scoreToCell(score.leftSoup),
+          _buleToCell(score),
+          _scoreToCell(score.rightSoup),
+          if (widget.game.noOfPlayers == 4)
+            _scoreToCell(score.rightSoup2),
+        ]
+    );
+  }
+
+  TableCell _scoreToCell(int? score){
+    String text = score != null ? score.toString() : '-';
+    return _buildDataCell(text);
+  }
+
+  TableCell _buleToCell(RoundScore score){
+    String text = score.score != null ? '${score.totalScore!.abs()} (${score.score.toString()})' : '-';
+    return _buildDataCell(text);
+  }
+
+  TableRow _dividerRow(){
+    return TableRow(
+      children: [
+        for (int i = 0; i < widget.game.noOfPlayers; i++)
+          const Divider(thickness: 4, color: Colors.grey,),
+      ]
+    );
+  }
+
+  TableRow _hatRow({bool reverse = false}){
+    return TableRow(
+      children: [
+        const Text(''),
+        Transform.rotate(
+          angle: reverse ? pi : 0,
+          child: Icon(
+            MdiIcons.hatFedora,
+            color: reverse ? Colors.red : Colors.green,
+          ),
+        ),
+        const Text(''),
+        if (widget.game.noOfPlayers == 4)
+          const Text(''),
+      ]
+    );
+  }
+
+  TableRow _sumsRow(ScoreSheet scoreSheet){
+    return TableRow(
+      children: [
+        _buildDataCell(scoreSheet.leftSoupTotal.toString()),
+        _buildDataCell(scoreSheet.totalScore.toString()),
+        _buildDataCell(scoreSheet.rightSoupTotal.toString()),
+        if (widget.game.noOfPlayers == 4)
+          _buildDataCell(scoreSheet.leftSoupTotal.toString()),
+      ]
+    );
+  }
 }

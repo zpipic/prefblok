@@ -127,13 +127,13 @@ class _NewGameDialogState extends State<NewGameDialog> {
 
     if (!valid) return;
 
-    int startingScore = int.parse(_startScoreController.text);
+    int startingScore = -int.parse(_startScoreController.text).abs();
 
     if (widget.game != null  && widget.game!.id != null){
       Game updatedGame = widget.game!;
       updatedGame.name = _nameController.text;
       updatedGame.noOfPlayers = _noOfPlayers;
-      updatedGame.startingScore = startingScore;
+      updatedGame.startingScore = startingScore.abs();
 
       List<ScoreSheet> scoreSheets = await gameQueries.getScoreSheetsGame(updatedGame.id);
       for (int i = 0; i < scoreSheets.length; i++){
@@ -183,6 +183,8 @@ class _NewGameDialogState extends State<NewGameDialog> {
           gameId: gameId,
           totalScore: startingScore,
           position: i,
+          rightSoupTotal2: _noOfPlayers == 4 ? 0 : null,
+          refeRight2: _noOfPlayers == 4 ? false : null,
         );
 
         dbHelper.insertScoreSheet(scoreSheet);

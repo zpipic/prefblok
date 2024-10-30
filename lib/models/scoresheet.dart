@@ -13,6 +13,7 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
   int rightSoupTotal;
   int? rightSoupTotal2;
   int position;
+  bool isUnderHat;
 
   ScoreSheet({
     this.id,
@@ -27,6 +28,7 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
     this.rightSoupTotal = 0,
     this.rightSoupTotal2,
     required this.position,
+    this.isUnderHat = false,
   });
 
 
@@ -50,6 +52,7 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
       'rightSoupTotal': rightSoupTotal,
       'rightSoupTotal2': rightSoupTotal2,
       'position': position,
+      'isUnderHat': isUnderHat ? 1 : 0,
     };
   }
 
@@ -67,6 +70,7 @@ class ScoreSheet implements BaseModel<ScoreSheet>{
       rightSoupTotal: map['rightSoupTotal'],
       rightSoupTotal2: map['rightSoupTotal2'],
       position: map['position'],
+      isUnderHat: map['isUnderHat'] == 1,
     );
   }
 }

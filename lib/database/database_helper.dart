@@ -64,6 +64,7 @@ class DatabaseHelper{
             rightSoupTotal INTEGER DEFAULT 0,
             rightSoupTotal2 INTEGER,
             position INTEGER,
+            isUnderHat INTEGER DEFAULT 0,
             FOREIGN KEY(gameId) REFERENCES games(id) ON DELETE CASCADE,
             FOREIGN KEY(playerId) REFERENCES players(id) ON DELETE CASCADE
           )
@@ -78,6 +79,7 @@ class DatabaseHelper{
             leftSoup INTEGER DEFAULT 0,
             rightSoup INTEGER DEFAULT 0,
             rightSoup2 INTEGER DEFAULT 0,
+            totalScore INTEGER DEFAULT 0,
             FOREIGN KEY(roundId) REFERENCES rounds(id) ON DELETE CASCADE,
             FOREIGN KEY(scoreSheetId) REFERENCES scoreSheets(id) ON DELETE CASCADE
           )

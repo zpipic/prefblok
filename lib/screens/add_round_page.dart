@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pref_blok/database/database_helper.dart';
 import '../models/models.dart';
 import '../enums/player_position.dart';
+import 'dart:math';
 
 class AddRoundPage extends StatefulWidget{
   Game game;
@@ -10,6 +11,8 @@ class AddRoundPage extends StatefulWidget{
   Round? existingRound;
   int roundNumber;
   int shuffler;
+  int maxContract;
+  final Function(Round, List<RoundScore>) onRoundCreated;
 
   AddRoundPage({
     required this.game,
@@ -19,6 +22,8 @@ class AddRoundPage extends StatefulWidget{
     required this.players,
     required this.roundNumber,
     required this.shuffler,
+    required this.onRoundCreated,
+    required this.maxContract,
   });
 
   @override
@@ -26,6 +31,7 @@ class AddRoundPage extends StatefulWidget{
 }
 
 class _AddRoundPageState extends State<AddRoundPage>{
+  final _formKey = GlobalKey<FormState>();
   int _selectedCaller = -1;
   List<bool> _played = List.filled(3, true);
   int _selectedContract = 0;
@@ -33,21 +39,51 @@ class _AddRoundPageState extends State<AddRoundPage>{
   bool _isGame = false;
   int _multiplier = 1;
 
+  String? _pointsError;
+
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   final _cardColors = {'pik': 2, 'karo': 3, 'herc': 4, 'tref': 5};
   final _otherGames = {'betl': 6, 'sans': 7, 'dalje': 0};
-  final kontre = {'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
+  final _kontre = {'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
 
-  void _saveGame(){
-    _multiplier = _multiplier*2;
+  void _saveGame() async{
+    if (!_formKey.currentState!.validate()){
+      return;
+    }
+
+    int totalPoints = 0;
+    for (int i = 0; i < 3; i++){
+      if (_played[i]) totalPoints += int.parse(_pointsControllers[i].text);
+    }
+    if (totalPoints != 10){
+      setState(() {
+        _pointsError = 'Zbroj štihova ($totalPoints) nije 10';
+      });
+      return;
+    }
+    else if (_selectedContract == 0 && _played.any((x) => x)){
+      setState(() {
+        _pointsError = 'Nitko nije zvao, a odabrani su igrači koji su igrali';
+      });
+      return;
+    }
+    else{
+      setState(() {
+        _pointsError = null;
+      });
+    }
+
+
+    int totalMultiplier = _multiplier*2;
 
     Round round = Round(
       gameId: widget.game.id!,
       roundNumber: widget.roundNumber,
       callerId: _selectedCaller >= 0 ? widget.players[_selectedCaller].id! : null,
       isIgra: _isGame,
-      multiplier: _multiplier,
+      multiplier: totalMultiplier,
+      calledGame: _selectedContract,
     );
 
     if (_selectedContract == 0){
@@ -107,10 +143,128 @@ class _AddRoundPageState extends State<AddRoundPage>{
         _dbHelper.updateScoreSheet(scoreSheet);
       }
     }
+
+    var roundId = await _dbHelper.insertRound(round);
+    round.id = roundId;
+
+    var callerPoints = int.parse(_pointsControllers[_selectedCaller].text);
+    //bool passed = callerPoints >= 6;
+    int contractValue = min(totalMultiplier * (_selectedContract + (_isGame ? 1 : 0)),
+                      widget.maxContract);
+
+    List<bool> passed = [];
+    for (int i = 0; i < _played.length; i++){
+      if (!_played[i]) {
+        passed.add(true);
+      }
+      else if (i == _selectedCaller) {
+        if(_selectedContract != 6) {
+          passed.add(callerPoints >= 6);
+        }
+        else {
+          passed.add(callerPoints < 1);
+        }
+      }
+      else if (_multiplier == 2 || _multiplier == 8){
+        if (_selectedContract == 6){
+          passed.add(callerPoints > 0);
+        }
+        else{
+          passed.add(callerPoints < 6);
+        }
+      }
+      else if(_selectedContract == 6){
+        passed.add(true);
+      }
+      else if (callerPoints <= 6){
+        passed.add(true);
+      }
+      else{
+        int playerPoints = int.parse(_pointsControllers[i].text);
+        passed.add(playerPoints >= 2);
+      }
+    }
+
+    List<RoundScore> scores = [];
+
+    for (int i = 0; i < widget.scoreSheets.length; i++){
+      var scoreSheet = widget.scoreSheets[i];
+      RoundScore score = RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
+
+      if (!_played[i]){
+        score.totalScore = scoreSheet.totalScore;
+        int scoreId = await _dbHelper.insertRoundScore(score);
+        score.id = scoreId;
+        scores.add(score);
+        continue;
+      }
+
+      var callerPosition = PlayerPosition.getRelativePosition(scoreSheet.position,
+          _selectedCaller, widget.game.noOfPlayers);
+      int soup = _selectedContract != 6 ?
+        min(contractValue * int.parse(_pointsControllers[i].text), contractValue * 5)
+        : (passed[_selectedCaller] ? 0 : contractValue * 5);
+      switch (callerPosition){
+        case PlayerPosition.left:
+          score.leftSoup = soup;
+          break;
+        case PlayerPosition.right:
+          score.rightSoup = soup;
+          break;
+        case PlayerPosition.right2:
+          score.rightSoup2 = soup;
+          break;
+        case PlayerPosition.center:
+          score.score = passed[i] ? contractValue : -contractValue;
+          break;
+      }
+      if (!passed[i]) score.score = -contractValue;
+
+      if (score.score != null){
+        score.totalScore = scoreSheet.totalScore + score.score!;
+      } else {
+        score.totalScore = scoreSheet.totalScore;
+      }
+
+      int id = await _dbHelper.insertRoundScore(score);
+      score.id = id;
+
+      scores.add(score);
+
+      if (score.score != null) {
+        scoreSheet.totalScore += score.score!;
+      }
+
+      if (score.leftSoup != null){
+        scoreSheet.leftSoupTotal += score.leftSoup!;
+      }
+
+      if (score.rightSoup != null){
+        scoreSheet.rightSoupTotal += score.rightSoup!;
+      }
+
+      if (score.rightSoup2 != null && widget.game.noOfPlayers == 4){
+        scoreSheet.rightSoupTotal2 = scoreSheet.rightSoupTotal2! + score.rightSoup2!;
+      }
+
+      _dbHelper.updateScoreSheet(scoreSheet);
+    }
+
+    widget.onRoundCreated(round, scores);
+    Navigator.pop(context);
   }
 
   ScoreSheet getScoreSheet(int playerId){
     return widget.scoreSheets.firstWhere((x) => x.playerId == playerId);
+  }
+
+
+  @override
+  void dispose() {
+    for (var controller in _pointsControllers){
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -138,9 +292,18 @@ class _AddRoundPageState extends State<AddRoundPage>{
                   ],
                 ),
               ),
-              _playersColumn(),
+              Form(
+                key: _formKey,
+                child: _playersColumn(),
+              ),
+              if (_pointsError != null) ...[
+                const SizedBox(height: 8,),
+                Text(
+                  _pointsError!,
+                  style: const TextStyle(color: Colors.red, fontSize: 14.0),
+                ),
+              ],
               const SizedBox(height: 40,),
-
               const Text('Zvanja', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
               const SizedBox(height: 20.0,),
               _contractWrap(),
@@ -161,7 +324,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
             ),
             ElevatedButton(
               onPressed: () {
-
+                _saveGame();
               },
               child: const Text('Spremi'),
             ),
@@ -218,11 +381,13 @@ class _AddRoundPageState extends State<AddRoundPage>{
             enabled: _played[index],
             keyboardType: TextInputType.number,
             validator: (value) {
-              if ((value == null || value.trim().isEmpty) && _played[index]){
+              if (!_played[index]) return null;
+
+              if (value == null || value.trim().isEmpty){
                 return 'Unesite broj štihova';
               }
               try {
-                int n = int.parse(value!);
+                int n = int.parse(value);
                 if (n < 0 || n > 10){
                   return 'Ilegalan broj štihova';
                 }
@@ -274,7 +439,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (var kontra in kontre.entries)
+            for (var kontra in _kontre.entries)
               _kontraWidget(kontra.key, kontra.value),
           ],
         ),
@@ -333,6 +498,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
           if (value == 0){
             _selectedCaller = -1;
             _played = List.filled(3, false);
+          }
+          else if (value == 6){
+            _played = List.filled(3, true);
           }
         });
       },

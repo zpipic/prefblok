@@ -25,6 +25,9 @@ class _GameScreenState extends State<GameScreen>{
   final ScoreSheetQueries _scoreSheetQueries = ScoreSheetQueries();
   final PageController _pageController = PageController();
 
+  final _cardColors = {2 : 'pik', 3: 'karo', 4: 'herc', 5: 'tref',
+    6: 'betl', 7: 'sans', 0: 'dalje'};
+
   bool _isLoading = true;
 
   List<Round> _rounds = [];
@@ -75,6 +78,13 @@ class _GameScreenState extends State<GameScreen>{
   void _incrementShuffler(){
     setState(() {
       _shuffler = (_shuffler + 1) % widget.game.noOfPlayers;
+    });
+    _saveShuffler();
+  }
+
+  void _decrementShuffler(){
+    setState(() {
+      _shuffler = (_shuffler + widget.game.noOfPlayers - 1) % widget.game.noOfPlayers;
     });
     _saveShuffler();
   }
@@ -147,15 +157,28 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   RoundScore? _getRoundScore(int roundId, int scoreSheetId){
-    return _roundScoresSheet[scoreSheetId]?.firstWhere((x) => x.roundId == roundId);
+    if (_roundScoresSheet[scoreSheetId] == null){
+      return RoundScore(roundId: roundId, scoreSheetId: scoreSheetId);
+    }
+    return _roundScoresSheet[scoreSheetId]?.
+      firstWhere((x) => x.roundId == roundId,
+        orElse: () => RoundScore(roundId: roundId, scoreSheetId: scoreSheetId));
   }
 
   List<RoundScore> _getScoresSheet(int scoreSheetId){
     return _roundScores.where((x) => x.scoreSheetId == scoreSheetId).toList();
   }
 
+  ScoreSheet _getScoreSheet(int id){
+    return _scoreSheets.firstWhere((x) => x.id == id);
+  }
+
   Player _getPlayer(int playerId){
     return _players.firstWhere((p) => p.id == playerId);
+  }
+
+  ScoreSheet _getScoreSheetPlayerId(int playerId){
+    return _scoreSheets.firstWhere((x) => x.playerId == playerId);
   }
 
   void _addRound(){
@@ -176,6 +199,7 @@ class _GameScreenState extends State<GameScreen>{
               shuffler: _shuffler,
               onRoundCreated: onRoundAdded,
               maxContract: _totalSum.abs(),
+              allScoreSheets: _scoreSheets,
           ),
       )
     );
@@ -278,6 +302,73 @@ class _GameScreenState extends State<GameScreen>{
     _checkGameOver();
   }
 
+  void _handleRoundDelete(Round round){
+    showDialog(
+      context: context,
+      builder: (BuildContext context){
+        return AlertDialog(
+          title: const Text('Obriši?'),
+          content: const Text('Obrisati rundu?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // If the user cancels, close the dialog
+                Navigator.of(context).pop();
+              },
+              child: const Text('Odustani'),
+            ),
+            TextButton(
+              onPressed: () {
+                _deleteRound(round);
+
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Obriši',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      });
+  }
+
+  void _deleteRound(Round round) async{
+    _decrementShuffler();
+    var scores = _getScoresRound(round.id!);
+
+    for (var score in scores){
+      var sheet = _getScoreSheet(score.scoreSheetId);
+
+      if (score.score != null){
+        sheet.totalScore -= score.score!;
+      }
+      if (score.rightSoup != null){
+        sheet.rightSoupTotal -= score.rightSoup!;
+      }
+      if (score.leftSoup != null){
+        sheet.leftSoupTotal -= score.leftSoup!;
+      }
+      if (score.rightSoup2 != null){
+        sheet.rightSoupTotal2 = sheet.rightSoupTotal2! + score.rightSoup2!;
+      }
+
+      if (round.refeUsed && sheet.playerId == round.callerId){
+        sheet.refe = true;
+      }
+
+      _dbHelper.updateScoreSheet(sheet);
+      await _dbHelper.deleteRoundScore(score.id!);
+    }
+    await _dbHelper.deleteRound(round.id!);
+
+    setState(() {
+      _initData();
+    });
+
+    Navigator.pop(context);
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -299,7 +390,15 @@ class _GameScreenState extends State<GameScreen>{
             IconButton(
               icon: const Icon(Icons.history),
               tooltip: 'Povijest rundi',
-              onPressed: () {},
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (BuildContext context) {
+                    return _buildRoundsTable();
+                  }
+                );
+              },
             ),
             IconButton(
               icon: const Icon(Icons.menu),
@@ -392,6 +491,97 @@ class _GameScreenState extends State<GameScreen>{
     );
   }
 
+  Widget _buildRoundsTable(){
+    return Container(
+      padding: EdgeInsets.all(32),
+      height: MediaQuery.of(context).size.height * 0.8,
+      //width: MediaQuery.of(context).size.width * 0.8,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            columnWidths: {
+              0: FixedColumnWidth(40)
+            },
+            defaultColumnWidth: const FixedColumnWidth(80),
+            border: const TableBorder(
+              horizontalInside: BorderSide(width: 1, color: Colors.grey),
+              verticalInside: BorderSide(width: 1, color: Colors.grey),
+            ),
+            children: [
+              TableRow(
+                children: [
+                  _centerWidget(text: ''),
+                  for (var player in _players)
+                    _centerWidget(text: player.name, bold: true, fontsize: 16),
+                  _centerWidget(text: 'Zvao', bold: true, fontsize: 16),
+                  _centerWidget(text: 'Igra', bold: true, fontsize: 16),
+                  _centerWidget(text: 'Kontra', bold: true, fontsize: 16),
+                  _centerWidget(text: 'Refe', bold: true, fontsize: 16),
+                ],
+              ),
+              ..._rounds.map((round){
+                var caller = round.callerId != null ? _getPlayer(round.callerId!) : null;
+
+                String gameText = '';
+                if (round.calledGame == null){
+                  gameText = 'dalje';
+                }
+                else{
+                  if (round.isIgra){
+                    gameText = 'igra ';
+                  }
+                  gameText += _cardColors[round.calledGame]!;
+                }
+
+                return TableRow(
+                  children: [
+                    GestureDetector(
+                      onTap: (){
+                        _handleRoundDelete(round);
+                      },
+                      child: const Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(Icons.delete),
+                          )
+                      ),
+                    ),
+                    ..._players.map((player) {
+                      var score = _getRoundScore(
+                          round.id!, _getScoreSheetPlayerId(player.id!).id!);
+                      return _centerWidget(text:  score?.totalPoints != null ? score!.totalPoints
+                          .toString() : '-');
+                    }),
+                    _centerWidget(text: caller != null ? caller.name : '-'),
+                    _centerWidget(text: gameText),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          round.kontra ? Icons.check : Icons.close,
+                      ),
+                    )
+                    ),
+                    Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Icon(
+                            round.refeUsed ? Icons.check : Icons.close,
+                          ),
+                        )
+                    ),
+                  ]
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTable(ScoreSheet scoreSheet){
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -412,10 +602,18 @@ class _GameScreenState extends State<GameScreen>{
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  _getPlayer(scoreSheet.playerId).name.toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
-                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _getPlayer(scoreSheet.playerId).name.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
+                    ),
+                    const SizedBox(width: 8.0,),
+                    if (scoreSheet.refe)
+                      Icon(MdiIcons.triangleOutline)
+                  ],
+                )
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -472,9 +670,11 @@ class _GameScreenState extends State<GameScreen>{
     int left = ((position - 1) % n + n) % n;
     int right = (position + 1) % n;
     List<TableCell> columns = [
-      _buildDataCell('${_players[left].name} juhe'),
+      _buildDataCellHeader('${_players[left].name} juhe',
+          _getScoreSheetPlayerId(_players[left].id!).refe),
       _buildDataCell('Bule'),
-      _buildDataCell('${_players[right].name} juhe'),
+      _buildDataCellHeader('${_players[right].name} juhe',
+          _getScoreSheetPlayerId(_players[right].id!).refe),
     ];
 
     if (n == 4){
@@ -496,6 +696,33 @@ class _GameScreenState extends State<GameScreen>{
         if (widget.game.noOfPlayers == 4)
           const Text(''),
       ],
+    );
+  }
+
+  TableCell _buildDataCellHeader(String text, bool refe){
+    return TableCell(
+        child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    text,
+                    softWrap: true,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 3,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  if (refe) ...[
+                    const SizedBox(width: 8,),
+                    Icon(MdiIcons.triangleOutline),
+                  ]
+                ],
+              ),
+
+            ))
     );
   }
 
@@ -581,6 +808,19 @@ class _GameScreenState extends State<GameScreen>{
         if (widget.game.noOfPlayers == 4)
           _buildDataCell(scoreSheet.leftSoupTotal.toString()),
       ]
+    );
+  }
+
+  Center _centerWidget({required String text, double fontsize = 14, bool bold = false}){
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Text(
+          text,
+          style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              fontSize: fontsize),
+        ),
+      ),
     );
   }
 }

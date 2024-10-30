@@ -25,6 +25,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _startScoreController = TextEditingController();
+  final _maxRefesController = TextEditingController();
   final List<TextEditingController> _playerControllers = List.generate(4, (_) => TextEditingController());
   final ScrollController _scrollController = ScrollController();
   final List<FocusNode> _dropdownFocusNodes = List.generate(4, (index) => FocusNode());
@@ -53,16 +54,21 @@ class _NewGameDialogState extends State<NewGameDialog> {
         }
       );
 
-      if (widget.game != null && widget.players != null){
-        if (widget.game!.name != null) _nameController.text = widget.game!.name!;
-        for (int i = 0; i < widget.game!.noOfPlayers; i++){
-          Player player = widget.players![i];
-          _playerControllers[i].text = player.name;
-          _selectedPlayers[i] = player;
-          _noOfPlayers = widget.players!.length;
-          _startScoreController.text = widget.game!.startingScore.toString();
+      setState(() {
+        if (widget.game != null && widget.players != null){
+          if (widget.game!.name != null) _nameController.text = widget.game!.name!;
+          for (int i = 0; i < widget.game!.noOfPlayers; i++){
+            Player player = widget.players![i];
+            _playerControllers[i].text = player.name;
+            _selectedPlayers[i] = player;
+            _noOfPlayers = widget.players!.length;
+            _startScoreController.text = widget.game!.startingScore.toString();
+            _maxRefesController.text = widget.game!.maxRefes.toString();
+          }
+        } else{
+          _maxRefesController.text = '1';
         }
-      }
+      });
     }
   }
 
@@ -95,6 +101,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
     _nameController.dispose();
     _scrollController.dispose();
     _startScoreController.dispose();
+    _maxRefesController.dispose();
     for(var controlller in _playerControllers){
       controlller.dispose();
     }
@@ -128,12 +135,14 @@ class _NewGameDialogState extends State<NewGameDialog> {
     if (!valid) return;
 
     int startingScore = -int.parse(_startScoreController.text).abs();
+    int maxRefes = int.parse(_maxRefesController.text);
 
     if (widget.game != null  && widget.game!.id != null){
       Game updatedGame = widget.game!;
       updatedGame.name = _nameController.text;
       updatedGame.noOfPlayers = _noOfPlayers;
       updatedGame.startingScore = startingScore.abs();
+      updatedGame.maxRefes = maxRefes;
 
       List<ScoreSheet> scoreSheets = await gameQueries.getScoreSheetsGame(updatedGame.id);
       for (int i = 0; i < scoreSheets.length; i++){
@@ -171,6 +180,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
         noOfPlayers: _noOfPlayers,
         startingScore: startingScore,
         name: _nameController.text,
+        maxRefes: maxRefes,
       );
 
       int gameId = await dbHelper.insertGame(game);
@@ -184,7 +194,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
           totalScore: startingScore,
           position: i,
           rightSoupTotal2: _noOfPlayers == 4 ? 0 : null,
-          refeRight2: _noOfPlayers == 4 ? false : null,
+          //refeRight2: _noOfPlayers == 4 ? false : null,
         );
 
         dbHelper.insertScoreSheet(scoreSheet);
@@ -242,6 +252,30 @@ class _NewGameDialogState extends State<NewGameDialog> {
                               }
                             } catch (e) {
                                 return 'Nije broj';
+                            }
+
+                            return null;
+                          },
+                          onChanged: (value){
+                            _formKey.currentState?.validate();
+                          },
+                        ),
+                        TextFormField(
+                          controller: _maxRefesController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Maksimalan broj refea',
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty){
+                              return 'Ne smije biti prazno';
+                            }
+                            try{
+                              if (int.parse(value) <= 0){
+                                return 'Nedozvoljena vrijednost';
+                              }
+                            } catch (e) {
+                              return 'Nije broj';
                             }
 
                             return null;

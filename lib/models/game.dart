@@ -8,6 +8,7 @@ class Game implements BaseModel<Game>{
   int noOfPlayers;
   bool isFinished;
   int startingScore;
+  int maxRefes;
 
   Game({
     this.id,
@@ -16,6 +17,7 @@ class Game implements BaseModel<Game>{
     required this.noOfPlayers,
     this.isFinished = false,
     required this.startingScore,
+    required this.maxRefes,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class Game implements BaseModel<Game>{
       'noOfPlayers': noOfPlayers,
       'isFinished': isFinished ? 1 : 0,
       'startingScore': startingScore,
+      'maxRefes': maxRefes,
     };
   }
 
@@ -37,6 +40,7 @@ class Game implements BaseModel<Game>{
       noOfPlayers: map['noOfPlayers'],
       isFinished: map['isFinished'] == 1,
       startingScore: map['startingScore'],
+      maxRefes: map['maxRefes'],
     );
   }
 

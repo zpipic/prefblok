@@ -46,7 +46,8 @@ class DatabaseHelper{
             date TEXT,
             noOfPlayers INTEGER,
             isFinished INTEGER DEFAULT 0,
-            startingScore INTEGER
+            startingScore INTEGER,
+            maxRefes INTEGER
           )
         ''');
 
@@ -56,15 +57,13 @@ class DatabaseHelper{
             gameId INTEGER,
             playerId INTEGER,
             refe INTEGER DEFAULT 0,
-            refeLeft INTEGER DEFAULT 0,
-            refeRight INTEGER DEFAULT 0,
-            refeRight2 INTEGER,
             totalScore INTEGER,
             leftSoupTotal INTEGER DEFAULT 0,
             rightSoupTotal INTEGER DEFAULT 0,
             rightSoupTotal2 INTEGER,
             position INTEGER,
             isUnderHat INTEGER DEFAULT 0,
+            refesUsed INTEGER DEFAULT 0,
             FOREIGN KEY(gameId) REFERENCES games(id) ON DELETE CASCADE,
             FOREIGN KEY(playerId) REFERENCES players(id) ON DELETE CASCADE
           )
@@ -80,6 +79,7 @@ class DatabaseHelper{
             rightSoup INTEGER DEFAULT 0,
             rightSoup2 INTEGER DEFAULT 0,
             totalScore INTEGER DEFAULT 0,
+            totalPoints INTEGER,
             FOREIGN KEY(roundId) REFERENCES rounds(id) ON DELETE CASCADE,
             FOREIGN KEY(scoreSheetId) REFERENCES scoreSheets(id) ON DELETE CASCADE
           )
@@ -94,6 +94,8 @@ class DatabaseHelper{
             calledGame INTEGER,
             isIgra INTEGER DEFAULT 0,
             multiplier INTEGER DEFAULT 2,
+            refeUsed INTEGER DEFAULT 0,
+            kontra INTEGER DEFAULT 0,
             FOREIGN KEY(callerId) REFERENCES players(id) ON DELETE CASCADE,
             FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
           )

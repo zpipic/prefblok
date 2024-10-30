@@ -8,6 +8,8 @@ class Round implements BaseModel<Round>{
   int? calledGame;
   bool isIgra;
   int multiplier;
+  bool refeUsed;
+  bool kontra;
 
   Round({
     this.id,
@@ -17,6 +19,8 @@ class Round implements BaseModel<Round>{
     this.calledGame,
     this.isIgra = false,
     this.multiplier = 2,
+    this.refeUsed = false,
+    this.kontra = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +32,8 @@ class Round implements BaseModel<Round>{
       'calledGame': calledGame,
       'isIgra': isIgra ? 1 : 0,
       'multiplier': multiplier,
+      'refeUsed': refeUsed ? 1 : 0,
+      'kontra': kontra ? 1 : 0,
     };
   }
 
@@ -40,6 +46,8 @@ class Round implements BaseModel<Round>{
       calledGame: map['calledGame'],
       isIgra: map['isIgra'] == 1,
       multiplier: map['multiplier'],
+      refeUsed: map['refeUsed'] == 1,
+      kontra: map['kontra'] == 1,
     );
   }
 

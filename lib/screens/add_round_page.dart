@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:pref_blok/database/database_helper.dart';
 import '../models/models.dart';
 import '../enums/player_position.dart';
@@ -7,6 +8,7 @@ import 'dart:math';
 class AddRoundPage extends StatefulWidget{
   Game game;
   List<ScoreSheet> scoreSheets;
+  List<ScoreSheet> allScoreSheets;
   List<Player> players;
   Round? existingRound;
   int roundNumber;
@@ -24,6 +26,7 @@ class AddRoundPage extends StatefulWidget{
     required this.shuffler,
     required this.onRoundCreated,
     required this.maxContract,
+    required this.allScoreSheets,
   });
 
   @override
@@ -34,7 +37,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
   final _formKey = GlobalKey<FormState>();
   int _selectedCaller = -1;
   List<bool> _played = List.filled(3, true);
-  int _selectedContract = 0;
+  int _selectedContract = -1;
   final List<TextEditingController> _pointsControllers = List.generate(3, (_) => TextEditingController());
   bool _isGame = false;
   int _multiplier = 1;
@@ -56,7 +59,13 @@ class _AddRoundPageState extends State<AddRoundPage>{
     for (int i = 0; i < 3; i++){
       if (_played[i]) totalPoints += int.parse(_pointsControllers[i].text);
     }
-    if (totalPoints != 10){
+    if (_selectedContract == -1){
+      setState(() {
+        _pointsError = 'Odaberite zvanje';
+      });
+      return;
+    }
+    if (totalPoints != 10 && _selectedContract != 0){
       setState(() {
         _pointsError = 'Zbroj štihova ($totalPoints) nije 10';
       });
@@ -65,6 +74,12 @@ class _AddRoundPageState extends State<AddRoundPage>{
     else if (_selectedContract == 0 && _played.any((x) => x)){
       setState(() {
         _pointsError = 'Nitko nije zvao, a odabrani su igrači koji su igrali';
+      });
+      return;
+    }
+    else if (_selectedCaller == -1 && _selectedContract != 0){
+      setState(() {
+        _pointsError = 'Odaberite pozivatelja';
       });
       return;
     }
@@ -87,34 +102,28 @@ class _AddRoundPageState extends State<AddRoundPage>{
     );
 
     if (_selectedContract == 0){
-      for (var scoreSheet in widget.scoreSheets){
-        scoreSheet.refe = true;
-        if (widget.game.noOfPlayers == 3){
-          scoreSheet.refeRight = true;
-          scoreSheet.refeLeft = true;
-        }
-        else{
-          switch(scoreSheet.position - widget.shuffler){
-            case 3:
-            case -1:
-              scoreSheet.refeLeft = true;
-              scoreSheet.refeRight2 = true;
-              break;
-            case -2:
-            case 2:
-              scoreSheet.refeLeft = true;
-              scoreSheet.refeRight = true;
-              break;
-            case -3:
-            case 1:
-              scoreSheet.refeRight = true;
-              scoreSheet.refeRight2 = true;
-              break;
-          }
+      var roundId = await _dbHelper.insertRound(round);
+      round.id = roundId;
+
+      List<RoundScore> scores = [];
+      for (var scoreSheet in widget.allScoreSheets){
+        if (scoreSheet.refesUsed < widget.game.maxRefes){
+          scoreSheet.refe = true;
+          scoreSheet.refesUsed += 1;
+          _dbHelper.updateScoreSheet(scoreSheet);
         }
 
-        _dbHelper.updateScoreSheet(scoreSheet);
+        RoundScore score = RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
+
+        score.totalScore = scoreSheet.totalScore;
+        int scoreId = await _dbHelper.insertRoundScore(score);
+        score.id = scoreId;
+        scores.add(score);
+
       }
+      widget.onRoundCreated(round, scores);
+      Navigator.pop(context);
+      return;
     }
 
     var caller = widget.players[_selectedCaller];
@@ -122,26 +131,32 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
     if (callerScoreSheet.refe){
       round.multiplier = round.multiplier*2;
-      for (var scoreSheet in widget.scoreSheets){
-        var position = PlayerPosition.getRelativePosition(scoreSheet.position,
-            callerScoreSheet.position, widget.game.noOfPlayers);
+      totalMultiplier *= 2;
 
-        switch (position){
-          case PlayerPosition.left:
-            scoreSheet.refeLeft = false;
-            break;
-          case PlayerPosition.right:
-            scoreSheet.refeRight = false;
-            break;
-          case PlayerPosition.right2:
-            scoreSheet.refeRight2 = false;
-            break;
-          default:
-            break;
-        }
+      round.refeUsed = true;
 
-        _dbHelper.updateScoreSheet(scoreSheet);
-      }
+      callerScoreSheet.refe = false;
+      _dbHelper.updateScoreSheet(callerScoreSheet);
+      // for (var scoreSheet in widget.scoreSheets){
+      //   var position = PlayerPosition.getRelativePosition(scoreSheet.position,
+      //       callerScoreSheet.position, widget.game.noOfPlayers);
+      //
+      //   switch (position){
+      //     case PlayerPosition.left:
+      //       scoreSheet.refeLeft = false;
+      //       break;
+      //     case PlayerPosition.right:
+      //       scoreSheet.refeRight = false;
+      //       break;
+      //     case PlayerPosition.right2:
+      //       scoreSheet.refeRight2 = false;
+      //       break;
+      //     default:
+      //       break;
+      //   }
+      //
+      //   _dbHelper.updateScoreSheet(scoreSheet);
+      // }
     }
 
     var roundId = await _dbHelper.insertRound(round);
@@ -166,6 +181,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
         }
       }
       else if (_multiplier == 2 || _multiplier == 8){
+        round.kontra = true;
         if (_selectedContract == 6){
           passed.add(callerPoints > 0);
         }
@@ -191,7 +207,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
       var scoreSheet = widget.scoreSheets[i];
       RoundScore score = RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
 
-      if (!_played[i]){
+      if (!_played[i] || _selectedContract == 0){
         score.totalScore = scoreSheet.totalScore;
         int scoreId = await _dbHelper.insertRoundScore(score);
         score.id = scoreId;
@@ -226,6 +242,8 @@ class _AddRoundPageState extends State<AddRoundPage>{
         score.totalScore = scoreSheet.totalScore;
       }
 
+      score.totalPoints = int.parse(_pointsControllers[i].text);
+
       int id = await _dbHelper.insertRoundScore(score);
       score.id = id;
 
@@ -249,6 +267,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
       _dbHelper.updateScoreSheet(scoreSheet);
     }
+
+    round.multiplier = totalMultiplier;
+    _dbHelper.updateRound(round);
 
     widget.onRoundCreated(round, scores);
     Navigator.pop(context);
@@ -381,9 +402,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
             enabled: _played[index],
             keyboardType: TextInputType.number,
             validator: (value) {
-              if (!_played[index]) return null;
+              if (!_played[index] || _selectedContract == 0) return null;
 
-              if (value == null || value.trim().isEmpty){
+              if ((value == null || value.trim().isEmpty)){
                 return 'Unesite broj štihova';
               }
               try {
@@ -398,7 +419,11 @@ class _AddRoundPageState extends State<AddRoundPage>{
               return null;
             },
           ),
-        )
+        ),
+        if (widget.scoreSheets[index].refe) ...[
+          const SizedBox(width: 8,),
+          Icon(MdiIcons.triangleOutline),
+        ]
       ],
     );
   }

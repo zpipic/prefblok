@@ -106,8 +106,8 @@ class _AddRoundPageState extends State<AddRoundPage>{
       round.id = roundId;
 
       List<RoundScore> scores = [];
-      for (var scoreSheet in widget.allScoreSheets){
-        if (scoreSheet.refesUsed < widget.game.maxRefes){
+      for (var scoreSheet in widget.allScoreSheets){  
+        if (scoreSheet.refesUsed < widget.game.maxRefes && !scoreSheet.refe && scoreSheet.totalScore < 0){
           scoreSheet.refe = true;
           scoreSheet.refesUsed += 1;
           _dbHelper.updateScoreSheet(scoreSheet);
@@ -216,7 +216,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
       }
 
       var callerPosition = PlayerPosition.getRelativePosition(scoreSheet.position,
-          _selectedCaller, widget.game.noOfPlayers);
+          callerScoreSheet.position, widget.game.noOfPlayers);
       int soup = _selectedContract != 6 ?
         min(contractValue * int.parse(_pointsControllers[i].text), contractValue * 5)
         : (passed[_selectedCaller] ? 0 : contractValue * 5);

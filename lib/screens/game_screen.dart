@@ -646,8 +646,8 @@ class _GameScreenState extends State<GameScreen>{
                               if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) < 0 &&
                                   (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) >= 0)
                                 _hatRow()
-                              else if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) > 0 &&
-                                  (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) <= 0)
+                              else if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) >= 0 &&
+                                  (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) < 0)
                                 _hatRow(reverse: true),
                             _roundScoreToRow(_roundScoresSheet[scoreSheet.id]![i]),
                           ],
@@ -806,7 +806,7 @@ class _GameScreenState extends State<GameScreen>{
         _buildDataCell(scoreSheet.totalScore.toString()),
         _buildDataCell(scoreSheet.rightSoupTotal.toString()),
         if (widget.game.noOfPlayers == 4)
-          _buildDataCell(scoreSheet.leftSoupTotal.toString()),
+          _buildDataCell(scoreSheet.rightSoupTotal2!.toString()),
       ]
     );
   }

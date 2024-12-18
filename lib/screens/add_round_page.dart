@@ -164,8 +164,6 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
     var callerPoints = int.parse(_pointsControllers[_selectedCaller].text);
     //bool passed = callerPoints >= 6;
-    int contractValue = min(totalMultiplier * (_selectedContract + (_isGame ? 1 : 0)),
-                      widget.maxContract);
 
     List<bool> passed = [];
     for (int i = 0; i < _played.length; i++){
@@ -200,6 +198,15 @@ class _AddRoundPageState extends State<AddRoundPage>{
         passed.add(playerPoints >= 2);
       }
     }
+
+    int contractValue;
+    if (!passed.any((item) => item == false)){
+      contractValue = min(totalMultiplier * (_selectedContract + (_isGame ? 1 : 0)),
+          widget.maxContract);
+    } else {
+      contractValue = totalMultiplier * (_selectedContract + (_isGame ? 1 : 0));
+    }
+
 
     List<RoundScore> scores = [];
 

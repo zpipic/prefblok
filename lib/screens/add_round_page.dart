@@ -41,6 +41,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
   final List<TextEditingController> _pointsControllers = List.generate(3, (_) => TextEditingController());
   bool _isGame = false;
   int _multiplier = 1;
+  bool _pozvanDrugi = false;
 
   String? _pointsError;
 
@@ -48,7 +49,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
   final _cardColors = {'pik': 2, 'karo': 3, 'herc': 4, 'tref': 5};
   final _otherGames = {'betl': 6, 'sans': 7, 'dalje': 0};
-  final _kontre = {'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
+  final _kontre = {'pozvan drugi': 69, 'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
 
   void _saveGame() async{
     if (!_formKey.currentState!.validate()){
@@ -192,6 +193,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
       }
       else if (callerPoints <= 6){
         passed.add(true);
+      }
+      else if (_pozvanDrugi) {
+        passed.add(callerPoints <= 6);
       }
       else{
         int playerPoints = int.parse(_pointsControllers[i].text);
@@ -587,7 +591,15 @@ class _AddRoundPageState extends State<AddRoundPage>{
     return GestureDetector(
         onTap: () {
           setState(() {
-            _multiplier = _multiplier != value ? value : 1;
+            if (value == 69 && !_pozvanDrugi){
+              _pozvanDrugi = true;
+              _multiplier = 1;
+            } else if (value == 69) {
+              _pozvanDrugi = false;
+            } else {
+              _multiplier = _multiplier != value ? value : 1;
+              _pozvanDrugi = false;
+            }
           });
         },
         child: Padding(
@@ -596,15 +608,15 @@ class _AddRoundPageState extends State<AddRoundPage>{
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               border: Border.all(
-                color: _multiplier == value
+                color: _multiplier == value || (value == 69 && _pozvanDrugi)
                     ? Colors.blue
                     : Colors.grey,
-                width: _multiplier == value
+                width: _multiplier == value || (value == 69 && _pozvanDrugi)
                     ? 2
                     : 1,
               ),
               borderRadius: BorderRadius.circular(8.0),
-              boxShadow: _multiplier == value
+              boxShadow: _multiplier == value || (value == 69 && _pozvanDrugi)
                   ? [
                 const BoxShadow(
                   color: Colors.black26,
@@ -614,7 +626,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
                 )
               ] : null,
             ),
-            child: Text('$kontra (x$value)'),
+            child: value != 69 ? Text('$kontra (x$value)') : Text(kontra),
           ),
         )
     );

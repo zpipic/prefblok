@@ -47,16 +47,6 @@ class _GameScreenState extends State<GameScreen>{
     _initData();
     _loadShuffler();
     super.initState();
-
-    _pageController.addListener(() {
-      if (_pageController.page == _pageController.page!.roundToDouble()) {
-        _scrollToBottom();
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
   }
 
   void _scrollToBottom() {
@@ -328,7 +318,7 @@ class _GameScreenState extends State<GameScreen>{
     }
 
     _checkGameOver();
-    _scrollToBottom();
+    //_scrollToBottom();
   }
 
   void _handleRoundDelete(Round round){
@@ -629,10 +619,6 @@ class _GameScreenState extends State<GameScreen>{
         return SizedBox(
           width: width,
           height: height,
-          // decoration: BoxDecoration(
-          //   border: Border.all(color: Colors.grey),
-          //   borderRadius: BorderRadius.circular(8.0),
-          // ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -646,72 +632,88 @@ class _GameScreenState extends State<GameScreen>{
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
                     ),
                     const SizedBox(width: 8.0,),
-                    if (scoreSheet.refe)
-                      Icon(MdiIcons.triangleOutline)
+                    if (scoreSheet.refe) Icon(MdiIcons.triangleOutline)
                   ],
-                )
+                ),
               ),
+
               Expanded(
                 child: Column(
                   children: [
-                    // ✅ First row (non-scrollable)
-                    Table(
-                      border: const TableBorder(
-                        verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
-                      ),
-                      children: [
-                        TableRow(
-                          children: _buildHeader(scoreSheet.position),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Colors.grey, width: 4)),
-                          ),
+                    // ✅ First row (non-scrollable) with padding
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0), // Left & right padding
+                      child: Table(
+                        border: const TableBorder(
+                          verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
                         ),
-                      ],
+                        children: [
+                          TableRow(
+                            children: _buildHeader(scoreSheet.position),
+                            decoration: const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: Colors.grey, width: 4)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
-                    // ✅ Scrollable middle rows
+                    // ✅ Scrollable middle rows with padding
                     Flexible(
-                      child: SingleChildScrollView(
-                        controller: _tableScrollController,
-                        child: Table(
-                          border: const TableBorder(
-                            verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
-                          ),
-                          children: [
-                            _buildFirsRow(),
-                            for (int i = 0; i < _roundScoresSheet[scoreSheet.id]!.length; i++)
-                              ...[
-                                if (i > 0)
-                                  if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) < 0 &&
-                                      (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) >= 0)
-                                    _hatRow()
-                                  else if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) >= 0 &&
-                                      (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) < 0)
-                                    _hatRow(reverse: true),
-                                _roundScoreToRow(_roundScoresSheet[scoreSheet.id]![i]),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0), // Left & right padding
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          thickness: 6.0,
+                          radius: Radius.circular(10),
+                          controller: _tableScrollController,
+                          child: SingleChildScrollView(
+                            reverse: true,
+                            controller: _tableScrollController,
+                            child: Table(
+                              border: const TableBorder(
+                                verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
+                              ),
+                              children: [
+                                _buildFirsRow(),
+                                for (int i = 0; i < _roundScoresSheet[scoreSheet.id]!.length; i++)
+                                  ...[
+                                    if (i > 0)
+                                      if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) < 0 &&
+                                          (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) >= 0)
+                                        _hatRow()
+                                      else if ((_roundScoresSheet[scoreSheet.id]![i-1].totalScore ?? 0) >= 0 &&
+                                          (_roundScoresSheet[scoreSheet.id]![i].totalScore ?? 0) < 0)
+                                        _hatRow(reverse: true),
+                                    _roundScoreToRow(_roundScoresSheet[scoreSheet.id]![i]),
+                                  ],
                               ],
-                          ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
 
-                    // ✅ Sums row (non-scrollable)
-                    Table(
-                      border: const TableBorder(
-                        verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
+                    // ✅ Sums row (non-scrollable) with padding
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0), // Left & right padding
+                      child: Table(
+                        border: const TableBorder(
+                          verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),
+                        ),
+                        children: [
+                          _dividerRow(),
+                          _sumsRow(scoreSheet),
+                        ],
                       ),
-                      children: [
-                        _dividerRow(),
-                        _sumsRow(scoreSheet),
-                      ],
                     ),
                   ],
-                )
-
-              )
+                ),
+              ),
             ],
-          )
+          ),
         );
+
       },
     );
   }
@@ -731,7 +733,8 @@ class _GameScreenState extends State<GameScreen>{
     if (n == 4){
       int right2 = (position + 2) % n;
       columns.add(
-        _buildDataCell('${_players[right2].name} juhe'),
+        _buildDataCellHeader('${_players[right2].name} juhe',
+            _getScoreSheetPlayerId(_players[right2].id!).refe),
       );
     }
 

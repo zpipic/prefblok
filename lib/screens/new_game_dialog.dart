@@ -39,6 +39,8 @@ class _NewGameDialogState extends State<NewGameDialog> {
   final List<Player> _placeholderPlayers = List.generate(4, (_) => Player(name: ''));
   List<bool> _dropdownValid = List.filled(4, true);
 
+  final List<GlobalKey> _dropdownKeys = List.generate(4, (index) => GlobalKey());
+
   int _noOfPlayers =  3;
 
   @override
@@ -206,6 +208,18 @@ class _NewGameDialogState extends State<NewGameDialog> {
     Navigator.of(context).pop();
   }
 
+  double _calculateDropdownHeight(BuildContext context, GlobalKey key) {
+    final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return 200; // Default height if calculation fails
+
+    final dropdownPosition = renderBox.localToGlobal(Offset.zero);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final availableHeightBelow = screenHeight - dropdownPosition.dy - 20; // 20px padding
+
+    return availableHeightBelow.clamp(150, 300); // Ensure min 150px and max 300px height
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -307,6 +321,8 @@ class _NewGameDialogState extends State<NewGameDialog> {
                                           },
                                           child: DropdownMenu<Player>(
                                             width: constraints.maxWidth - 56, // Set the width to fill the dialog
+                                            key: _dropdownKeys[i],
+                                            menuHeight: 150,
                                             initialSelection: _selectedPlayers[i],
                                             controller: _playerControllers[i],
                                             enableFilter: true,

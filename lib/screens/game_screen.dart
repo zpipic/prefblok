@@ -229,7 +229,7 @@ class _GameScreenState extends State<GameScreen>{
               Text('Pobjednik: ${winner.name}'),
               SizedBox(height: 10,),
               Text('Rezultati:'),
-              ...scores.entries.map((entry) => Text("${entry.key.name}: ${entry.value}")),
+              ...scores.entries.toList().map((entry) => Text("${entry.key.name}: ${entry.value}")),
             ],
           ),
           actions: [
@@ -281,7 +281,11 @@ class _GameScreenState extends State<GameScreen>{
       scores[_getPlayer(scoreSheet.playerId)] = score;
     }
 
-    return scores;
+    Map<Player, int> sortedScores = Map.fromEntries(
+      scores.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value)), // Sort by values in descending order
+    );
+    return sortedScores;
   }
 
   void onRoundAdded(Round round, List<RoundScore> scores) async{

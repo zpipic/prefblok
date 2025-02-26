@@ -75,7 +75,7 @@ class _HomePageState extends State<Homepage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => GameScreen(game: game))
-    );
+    ).then((_) => setState(() { }));
   }
 
   void _openMenu(BuildContext context){

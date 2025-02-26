@@ -51,6 +51,8 @@ class _AddRoundPageState extends State<AddRoundPage>{
   final _otherGames = {'betl': 6, 'sans': 7, 'dalje': 0};
   final _kontre = {'pozvan drugi': 69, 'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
 
+
+
   void _saveGame() async{
     if (!_formKey.currentState!.validate()){
       return;
@@ -290,6 +292,22 @@ class _AddRoundPageState extends State<AddRoundPage>{
     return widget.scoreSheets.firstWhere((x) => x.playerId == playerId);
   }
 
+  void _setCallerPoints([int index = -1]){
+    if (_selectedCaller == -1 || index == _selectedCaller) return;
+
+    int total = 0;
+    for (int i = 0; i < _pointsControllers.length; i++){
+      if (i == _selectedCaller) continue;
+      var points = (_played[i])
+          ? int.tryParse(_pointsControllers[i].text) ?? 0
+          : 0;
+      total += points;
+    }
+    setState(() {
+      var callerPoints = 10 - total;
+      _pointsControllers[_selectedCaller].text = callerPoints.toString();
+    });
+  }
 
   @override
   void dispose() {
@@ -392,6 +410,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
                 _played = List.filled(_played.length, false);
               }
             });
+            _setCallerPoints();
           },
         ),
         Checkbox(
@@ -402,6 +421,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
                   setState(() {
                     _played[index] = value!;
                   });
+                  _setCallerPoints();
               },
         ),
         Expanded(
@@ -412,6 +432,11 @@ class _AddRoundPageState extends State<AddRoundPage>{
             ),
             enabled: _played[index],
             keyboardType: TextInputType.number,
+            onChanged: (value) {
+              if (index != _selectedCaller){
+                _setCallerPoints(index);
+              }
+            },
             validator: (value) {
               if (!_played[index] || _selectedContract == 0) return null;
 
@@ -426,7 +451,6 @@ class _AddRoundPageState extends State<AddRoundPage>{
               } catch (e){
                 return 'Nije unesen broj';
               }
-
               return null;
             },
           ),

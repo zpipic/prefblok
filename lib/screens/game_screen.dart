@@ -26,6 +26,7 @@ class _GameScreenState extends State<GameScreen>{
   final PageController _pageController = PageController();
 
   final ScrollController _tableScrollController = ScrollController();
+  final List<ScrollController> _scrollControllers = List.generate(4, (_) => ScrollController());
 
   final _cardColors = {2 : 'pik', 3: 'karo', 4: 'herc', 5: 'tref',
     6: 'betl', 7: 'sans', 0: 'dalje'};
@@ -751,10 +752,10 @@ class _GameScreenState extends State<GameScreen>{
                           thumbVisibility: true,
                           thickness: 6.0,
                           radius: Radius.circular(10),
-                          controller: _tableScrollController,
+                          controller: _scrollControllers[scoreSheet.position],
                           child: SingleChildScrollView(
                             reverse: true,
-                            controller: _tableScrollController,
+                            controller: _scrollControllers[scoreSheet.position],
                             child: Table(
                               border: const TableBorder(
                                 verticalInside: BorderSide(width: 2, style: BorderStyle.solid, color: Colors.grey),

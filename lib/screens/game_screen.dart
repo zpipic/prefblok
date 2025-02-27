@@ -395,6 +395,76 @@ class _GameScreenState extends State<GameScreen>{
     super.dispose();
   }
 
+  Future<int?> showShufflerSelectionDialog(BuildContext context) async {
+    int selectedShuffler = _shuffler;
+
+    Widget _buildPlayerOption(BuildContext context, int index, Function setState) {
+      return GestureDetector(
+        onTap: () {
+          setState((){
+            selectedShuffler = index;
+          });
+        },
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: selectedShuffler == index ? Colors.blue : Colors.grey[300],
+              child: Icon(Icons.person, color: selectedShuffler == index ? Colors.white : Colors.black),
+            ),
+            const SizedBox(height: 5),
+            Text(_players[index].name),
+          ],
+        ),
+      );
+    }
+
+    int? result = await showDialog<int>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Select Shuffler"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPlayerOption(context, 0, setState),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildPlayerOption(context, _players.length - 1, setState),
+                      const Icon(Icons.table_chart, size: 50, color: Colors.grey),
+                      _buildPlayerOption(context, 1, setState),
+                    ],
+                  ),
+
+                  if (_players.length == 4)
+                    _buildPlayerOption(context, 2, setState),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(-1),
+                  child: const Text("Odustani"),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(selectedShuffler),
+                  child: const Text("Spremi"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == -1) return null;
+
+    return selectedShuffler;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading){
@@ -428,19 +498,34 @@ class _GameScreenState extends State<GameScreen>{
         ),
         body: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.shuffle),
-                const SizedBox(width: 5,),
-                Text(
-                  _players[_shuffler].name,
-                  style: const TextStyle(
-                    fontSize: 14,
+            GestureDetector(
+              onTap: () async {
+                var newShuffler = await showShufflerSelectionDialog(context);
+                if (newShuffler != null){
+                  setState(() {
+                    _shuffler = newShuffler;
+                  });
+                  _saveShuffler();
+                }
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.shuffle),
+                  const SizedBox(width: 5,),
+                  Text(
+                    _players[_shuffler].name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 5,),
+                  const Icon(Icons.edit),
+                ],
+              ),
             ),
+            const SizedBox(height: 5,),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -449,7 +534,7 @@ class _GameScreenState extends State<GameScreen>{
                 Text(
                   _totalSum.toString(),
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                   ),
                 ),
               ],

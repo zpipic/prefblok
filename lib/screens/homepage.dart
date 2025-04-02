@@ -172,9 +172,13 @@ class _HomePageState extends State<Homepage> {
                       ),
                       title: Text(
                         (game.name?.trim().isNotEmpty ?? false) ? game.name! : '<nema ime>',
-                        style: (game.name?.trim().isNotEmpty ?? false)
-                            ? const TextStyle(fontSize: 16, color: Colors.black)
-                            : const TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
+                          style: (game.name?.trim().isNotEmpty ?? false)
+                              ? TextStyle(
+                                fontSize: 16,
+                                color: (game.name?.trim().isNotEmpty ?? false)
+                                  ? Theme.of(context).textTheme.bodyMedium?.color
+                                  : Colors.grey,)
+                              : const TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
                       ),
                       subtitle: Text(
                           '''Datum: ${game.dateToString()}\nIgrači: $playerNames'''

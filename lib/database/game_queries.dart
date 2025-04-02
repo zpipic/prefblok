@@ -62,4 +62,5 @@ class GameQueries extends BaseQuery{
     var data = await super.getByIdBase(tableName, 'id', id);
     return data != null ? Game.fromMap(data) : null;
   }
+
 }

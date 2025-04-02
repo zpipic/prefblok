@@ -377,6 +377,13 @@ class _GameScreenState extends State<GameScreen>{
         sheet.refe = true;
       }
 
+      if (round.calledGame == 0){
+        if (sheet.refe){
+          sheet.refe = false;
+          sheet.refesUsed -= 1;
+        }
+      }
+
       _dbHelper.updateScoreSheet(sheet);
       await _dbHelper.deleteRoundScore(score.id!);
     }
@@ -427,7 +434,7 @@ class _GameScreenState extends State<GameScreen>{
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text("Select Shuffler"),
+              title: const Text("Odaberite djelitelja"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

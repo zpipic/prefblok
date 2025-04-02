@@ -64,7 +64,7 @@ class _NewGameDialogState extends State<NewGameDialog> {
             _playerControllers[i].text = player.name;
             _selectedPlayers[i] = player;
             _noOfPlayers = widget.players!.length;
-            _startScoreController.text = widget.game!.startingScore.toString();
+            _startScoreController.text = widget.game!.startingScore.abs().toString();
             _maxRefesController.text = widget.game!.maxRefes.toString();
           }
         } else{
@@ -221,7 +221,11 @@ class _NewGameDialogState extends State<NewGameDialog> {
 
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context){
+    return _buildDialog(context);
+  }
+
+  Widget _buildDialog(BuildContext context) {
     return Dialog(
       child: SingleChildScrollView(
         controller: _scrollController,

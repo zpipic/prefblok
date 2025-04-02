@@ -453,6 +453,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
               }
               return null;
             },
+            onTapOutside: (_) => {
+              FocusManager.instance.primaryFocus?.unfocus()
+            },
           ),
         ),
         if (widget.scoreSheets[index].refe) ...[

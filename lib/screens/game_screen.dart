@@ -396,6 +396,10 @@ class _GameScreenState extends State<GameScreen>{
     Navigator.pop(context);
   }
 
+  int _getRefesLeft(ScoreSheet scoresheet){
+    return widget.game.maxRefes - scoresheet.refesUsed;
+  }
+  
   @override
   void dispose() {
     _pageController.dispose();
@@ -438,18 +442,18 @@ class _GameScreenState extends State<GameScreen>{
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildPlayerOption(context, 0, setState),
+                  _buildPlayerOption(context, 1, setState),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildPlayerOption(context, _players.length - 1, setState),
+                      _buildPlayerOption(context, 0, setState),
                       const Icon(Icons.table_chart, size: 50, color: Colors.grey),
-                      _buildPlayerOption(context, 1, setState),
+                      _buildPlayerOption(context, 2, setState),
                     ],
                   ),
 
                   if (_players.length == 4)
-                    _buildPlayerOption(context, 2, setState),
+                    _buildPlayerOption(context, 3, setState),
                 ],
               ),
               actions: [
@@ -716,7 +720,7 @@ class _GameScreenState extends State<GameScreen>{
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -729,6 +733,17 @@ class _GameScreenState extends State<GameScreen>{
                   ],
                 ),
               ),
+
+              Text(
+                'Ostalo refa: ${_getRefesLeft(scoreSheet)}',
+                style: TextStyle(
+                  fontSize: 14.0,
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                ),
+              ),
+
+              const SizedBox(height: 16,),
 
               Expanded(
                 child: Column(

@@ -724,10 +724,29 @@ class _GameScreenState extends State<GameScreen>{
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      _getPlayer(scoreSheet.playerId).name.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
+                    Stack(
+                      alignment: Alignment.topLeft,
+                      clipBehavior: Clip.none,
+                      children: [
+                        Text(
+                          _getPlayer(scoreSheet.playerId).name.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22.0),
+                        ),
+                        if (scoreSheet.totalScore >= 0)
+                          Positioned(
+                          left: -5,
+                          top: -8,
+                          child: Transform.rotate(
+                            angle: -0.4,
+                            child: Icon(
+                              MdiIcons.hatFedora,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+
                     const SizedBox(width: 8.0,),
                     if (scoreSheet.refe) Icon(MdiIcons.triangleOutline)
                   ],

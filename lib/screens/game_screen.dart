@@ -9,11 +9,14 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 
 class GameScreen extends StatefulWidget{
+  final FlutterLocalNotificationsPlugin notifications;
   Game game;
 
-  GameScreen({super.key, required this.game});
+  GameScreen({super.key, required this.game, required this.notifications});
 
   @override
   _GameScreenState createState() => _GameScreenState();
@@ -45,9 +48,34 @@ class _GameScreenState extends State<GameScreen>{
 
   @override
   void initState(){
-    _initData();
-    _loadShuffler();
     super.initState();
+
+    _init();
+  }
+
+  void _init() async {
+    await _initData();
+    await _loadShuffler();
+    await _showNotification();
+  }
+
+  Future<void> _showNotification() async {
+    await widget.notifications.show(
+      999,
+      'Miješa: ${_players[_shuffler].name}',
+      'Zbroj: $_totalSum',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'screen_channel_id',
+          'Screen Notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+          ongoing: true,
+          autoCancel: false,
+          icon: 'ic_stat_notify',
+        )
+      )
+    );
   }
 
   void _scrollToBottom() {
@@ -62,7 +90,7 @@ class _GameScreenState extends State<GameScreen>{
     });
   }
 
-  void _loadShuffler() async {
+  Future<void> _loadShuffler() async {
     //await _deleteShuffler();
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -88,6 +116,8 @@ class _GameScreenState extends State<GameScreen>{
   Future<void> _saveShuffler() async{
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setInt('shuffler_${widget.game.id}', _shuffler);
+
+    _showNotification();
   }
 
   void _incrementShuffler(){
@@ -111,7 +141,7 @@ class _GameScreenState extends State<GameScreen>{
     }
   }
 
-  void _initData() async{
+  Future<void> _initData() async{
     await _loadRounds();
     await _loadPlayers();
     await _loadScoreSheets();
@@ -320,6 +350,7 @@ class _GameScreenState extends State<GameScreen>{
 
     _checkGameOver();
     //_scrollToBottom();
+    _showNotification();
   }
 
   void _handleRoundDelete(Round round){
@@ -394,6 +425,7 @@ class _GameScreenState extends State<GameScreen>{
     });
 
     Navigator.pop(context);
+    _showNotification();
   }
 
   int _getRefesLeft(ScoreSheet scoresheet){
@@ -404,6 +436,7 @@ class _GameScreenState extends State<GameScreen>{
   void dispose() {
     _pageController.dispose();
     _tableScrollController.dispose();
+    widget.notifications.cancel(999);
     super.dispose();
   }
 

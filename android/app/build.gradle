@@ -60,3 +60,11 @@ android {
 flutter {
     source = "../.."
 }
+
+android.applicationVariants.all { variant ->
+    variant.outputs.all {
+        def appName = "pref_blok"
+        def versionName = variant.versionName
+        outputFileName = "${appName}_${versionName}.apk"
+    }
+}

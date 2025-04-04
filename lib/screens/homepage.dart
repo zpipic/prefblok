@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:pref_blok/main.dart';
 import 'package:pref_blok/screens/game_screen.dart';
 import 'package:pref_blok/screens/new_game_dialog.dart';
 import 'package:pref_blok/screens/players_list_page.dart';
 import '../database/database_helper.dart';
 import '../models/models.dart';
 import '../database/game_queries.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+  
 
 class Homepage extends StatefulWidget{
-  const Homepage({super.key});
+  final FlutterLocalNotificationsPlugin notifications;
 
+  const Homepage({super.key, required this.notifications});
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -24,6 +28,7 @@ class _HomePageState extends State<Homepage> {
     super.initState();
     _loadGames();
   }
+
 
   void _loadGames() async {
     final data = await dbHelper.getGames();
@@ -74,7 +79,7 @@ class _HomePageState extends State<Homepage> {
   void _navigateToGamePage(Game game){
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => GameScreen(game: game))
+      MaterialPageRoute(builder: (context) => GameScreen(game: game, notifications: notifications,))
     ).then((_) => setState(() { }));
   }
 

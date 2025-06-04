@@ -401,7 +401,7 @@ class _GameScreenState extends State<GameScreen>{
         sheet.leftSoupTotal -= score.leftSoup!;
       }
       if (score.rightSoup2 != null){
-        sheet.rightSoupTotal2 = sheet.rightSoupTotal2! + score.rightSoup2!;
+        sheet.rightSoupTotal2 = sheet.rightSoupTotal2! - score.rightSoup2!;
       }
 
       if (round.refeUsed && sheet.playerId == round.callerId){

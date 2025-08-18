@@ -28,13 +28,13 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Preferans blok',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal.shade900),
         useMaterial3: true,
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: Colors.teal.shade900,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,

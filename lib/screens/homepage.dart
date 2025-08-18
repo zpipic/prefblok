@@ -7,7 +7,8 @@ import '../database/database_helper.dart';
 import '../models/models.dart';
 import '../database/game_queries.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-  
+import 'package:intl/intl.dart';
+
 class GameWithPlayers {
   final Game game;
   final List<Player> players;
@@ -23,6 +24,19 @@ String playersKey(List<Player> players) =>
 // format; '1|2|3...|FIN'
 String groupKey(List<Player> players, bool isFinished) =>
     '${playersKey(List<Player>.from(players))}|${isFinished ? 'FIN' : 'RUN'}';
+
+String partijaLabel(int n) {
+  final lastTwo = n % 100;
+  final lastOne = n % 10;
+
+  if (lastOne == 1 && lastTwo != 11) {
+    return '$n partija';
+  } else if ([2, 3, 4].contains(lastOne) && !(lastTwo >= 12 && lastTwo <= 14)) {
+    return '$n partije';
+  } else {
+    return '$n partija';
+  }
+}
 
 class PlayersGroup{
   final String key;
@@ -127,11 +141,26 @@ class _HomePageState extends State<Homepage> {
             );
           }
           else {
-            return NewGameDialog(onCreateGame: (newGame) {
+            return NewGameDialog(onCreateGame: (newGame) async {
+              final gamePlayers = await gameQueries.getPlayersInGame(newGame.id!);
+              final key = groupKey(gamePlayers, newGame.isFinished);
+
+              int index = _gameGroups.indexWhere((g) => g.key == key);
+              PlayersGroup group;
+              GameWithPlayers gwp = GameWithPlayers(newGame, gamePlayers);
+              if (index != -1) {
+                group = _gameGroups.removeAt(index);
+                group.games.insert(0, gwp);
+              } else {
+                List<GameWithPlayers> gameList = [gwp];
+                group = PlayersGroup(key, gamePlayers, gameList, newGame.isFinished);
+              }
+
               setState(() {
                 _games.insert(0, newGame);
+                _gameGroups.insert(0, group);
               });
-          });
+            });
         }
       },
     );
@@ -278,6 +307,7 @@ class _HomePageState extends State<Homepage> {
 
     return ListView(
       children: [
+        _buildFilterSummary(),
         if (running.isNotEmpty) ...[
           _SectionHeader(label: 'Aktivne'),
           ..._buildGroupTiles(running),
@@ -292,23 +322,11 @@ class _HomePageState extends State<Homepage> {
     );
   }
 
-  String partijaLabel(int n) {
-    final lastTwo = n % 100;
-    final lastOne = n % 10;
-
-    if (lastOne == 1 && lastTwo != 11) {
-      return '$n partija';
-    } else if ([2, 3, 4].contains(lastOne) && !(lastTwo >= 12 && lastTwo <= 14)) {
-      return '$n partije';
-    } else {
-      return '$n partija';
-    }
-  }
-
   List<Widget> _buildGroupTiles(List<PlayersGroup> groups){
     return List.generate(groups.length, (i){
       final group = groups[i];
-      final playersLabel = (group.players..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())))
+      final playersLabel = ([...group.players]
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())))
           .map((p) => p.name)
           .join(', ');
 
@@ -366,6 +384,51 @@ class _HomePageState extends State<Homepage> {
         ),
       );
     });
+  }
+
+  Widget _buildFilterSummary() {
+    if (_activeQuery == null) {
+      return const Padding(
+        padding: EdgeInsets.all(8),
+        child: Text("Prikazuju se sve partije"),
+      );
+    }
+
+    final parts = <String>[];
+
+    if (_activeQuery!.playerIds.isNotEmpty) {
+      final names = allPlayers
+          .where((p) => _activeQuery!.playerIds.contains(p.id))
+          .map((p) => p.name)
+          .toList();
+      parts.add("Igrači: ${names.join(', ')}");
+    }
+
+    if (_activeQuery!.dateRange != null) {
+      final dr = _activeQuery!.dateRange!;
+      final df = DateFormat('dd/MM/yyyy');
+      parts.add("Datumi: ${df.format(dr.start)} – ${df.format(dr.end)}");;
+    }
+
+    if (_activeQuery!.text.isNotEmpty) {
+      parts.add("Tekst: \"${_activeQuery!.text}\"");
+    }
+
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          parts.isEmpty ? "Prikazuju se sve partije" : parts.join(' • '),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w500,
+          ),
+          softWrap: true,
+          overflow: TextOverflow.visible,
+        ),
+      ),
+    );
   }
 
   Future<GameSearchQuery?> _openFilters(BuildContext context) async {
@@ -586,11 +649,19 @@ class _HomePageState extends State<Homepage> {
         q.playerIds.isEmpty ||
             q.playerIds.every((id) => g.players.any((p) => p.id == id));
 
-    bool dateOk(PlayersGroup g) =>
-        q.dateRange == null ||
-            g.games.any((gwp) =>
-            gwp.game.date.isAfter(q.dateRange!.start) &&
-                gwp.game.date.isBefore(q.dateRange!.end));
+    DateTime onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
+
+    bool dateOk(PlayersGroup g) {
+      if (q.dateRange == null) return true;
+
+      final start = onlyDate(q.dateRange!.start);
+      final end   = onlyDate(q.dateRange!.end);
+
+      return g.games.any((gwp) {
+        final d = onlyDate(gwp.game.date);
+        return !d.isBefore(start) && !d.isAfter(end);
+      });
+    }
 
     bool textOk(PlayersGroup g) =>
         q.text.isEmpty ||
@@ -622,6 +693,7 @@ class _SectionHeader extends StatelessWidget{
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontSize: 18,
                 color: cs.onSecondaryContainer,
                 fontWeight: FontWeight.w600,
               ),
@@ -631,6 +703,7 @@ class _SectionHeader extends StatelessWidget{
       ),
     );
   }
+
 }
 
 class _GameTile extends StatelessWidget {

@@ -60,6 +60,8 @@ class _GameScreenState extends State<GameScreen>{
   }
 
   Future<void> _showNotification() async {
+    if (widget.game.isFinished) return;
+
     await widget.notifications.show(
       999,
       'Miješa: ${_players[_shuffler].name}',
@@ -255,6 +257,7 @@ class _GameScreenState extends State<GameScreen>{
       return;
     }
 
+    widget.notifications.cancel(999);
     widget.game.isFinished = true;
     await _dbHelper.updateGame(widget.game);
 
@@ -348,9 +351,9 @@ class _GameScreenState extends State<GameScreen>{
       });
     }
 
+    _showNotification();
     _checkGameOver();
     //_scrollToBottom();
-    _showNotification();
   }
 
   void _handleRoundDelete(Round round){
@@ -479,9 +482,9 @@ class _GameScreenState extends State<GameScreen>{
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildPlayerOption(context, 0, setState),
-                      const Icon(Icons.table_chart, size: 50, color: Colors.grey),
                       _buildPlayerOption(context, 2, setState),
+                      const Icon(Icons.table_chart, size: 50, color: Colors.grey),
+                      _buildPlayerOption(context, 0, setState),
                     ],
                   ),
 

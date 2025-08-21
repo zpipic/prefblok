@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:pref_blok/database/database_helper.dart';
 import '../models/models.dart';
 import '../enums/player_position.dart';
 import 'dart:math';
 
-class AddRoundPage extends StatefulWidget{
+class AddRoundPage extends StatefulWidget {
   Game game;
   List<ScoreSheet> scoreSheets;
   List<ScoreSheet> allScoreSheets;
@@ -33,12 +34,13 @@ class AddRoundPage extends StatefulWidget{
   _AddRoundPageState createState() => _AddRoundPageState();
 }
 
-class _AddRoundPageState extends State<AddRoundPage>{
+class _AddRoundPageState extends State<AddRoundPage> {
   final _formKey = GlobalKey<FormState>();
   int _selectedCaller = -1;
   List<bool> _played = List.filled(3, true);
   int _selectedContract = -1;
-  final List<TextEditingController> _pointsControllers = List.generate(3, (_) => TextEditingController());
+  final List<TextEditingController> _pointsControllers =
+      List.generate(3, (_) => TextEditingController());
   bool _isGame = false;
   int _multiplier = 1;
   bool _pozvanDrugi = false;
@@ -49,80 +51,82 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
   final _cardColors = {'pik': 2, 'karo': 3, 'herc': 4, 'tref': 5};
   final _otherGames = {'betl': 6, 'sans': 7, 'dalje': 0};
-  final _kontre = {'kontra': 2, 'rekontra': 4, 'subkontra': 8, 'mortkontra' : 16};
+  final _kontre = {
+    'kontra': 2,
+    'rekontra': 4,
+    'subkontra': 8,
+    'mortkontra': 16
+  };
 
-
-
-  void _saveGame() async{
-    if (!_formKey.currentState!.validate()){
+  void _saveGame() async {
+    if ((_formKey.currentState == null || !_formKey.currentState!.validate()) && _selectedContract != 0) {
       return;
     }
 
     int totalPoints = 0;
-    for (int i = 0; i < 3; i++){
+    for (int i = 0; i < 3; i++) {
       if (_played[i]) totalPoints += int.parse(_pointsControllers[i].text);
     }
-    if (_selectedContract == -1){
+    if (_selectedContract == -1) {
       setState(() {
         _pointsError = 'Odaberite zvanje';
       });
       return;
     }
-    if (totalPoints != 10 && _selectedContract != 0){
+    if (totalPoints != 10 && _selectedContract != 0) {
       setState(() {
         _pointsError = 'Zbroj štihova ($totalPoints) nije 10';
       });
       return;
-    }
-    else if (_selectedContract == 0 && _played.any((x) => x)){
+    } else if (_selectedContract == 0 && _played.any((x) => x)) {
       setState(() {
         _pointsError = 'Nitko nije zvao, a odabrani su igrači koji su igrali';
       });
       return;
-    }
-    else if (_selectedCaller == -1 && _selectedContract != 0){
+    } else if (_selectedCaller == -1 && _selectedContract != 0) {
       setState(() {
         _pointsError = 'Odaberite pozivatelja';
       });
       return;
-    }
-    else{
+    } else {
       setState(() {
         _pointsError = null;
       });
     }
 
-
-    int totalMultiplier = _multiplier*2;
+    int totalMultiplier = _multiplier * 2;
 
     Round round = Round(
       gameId: widget.game.id!,
       roundNumber: widget.roundNumber,
-      callerId: _selectedCaller >= 0 ? widget.players[_selectedCaller].id! : null,
+      callerId:
+          _selectedCaller >= 0 ? widget.players[_selectedCaller].id! : null,
       isIgra: _isGame,
       multiplier: totalMultiplier,
       calledGame: _selectedContract,
     );
 
-    if (_selectedContract == 0){
+    if (_selectedContract == 0) {
       var roundId = await _dbHelper.insertRound(round);
       round.id = roundId;
 
       List<RoundScore> scores = [];
-      for (var scoreSheet in widget.allScoreSheets){  
-        if (scoreSheet.refesUsed < widget.game.maxRefes && !scoreSheet.refe && scoreSheet.totalScore < 0){
+      for (var scoreSheet in widget.allScoreSheets) {
+        if (scoreSheet.refesUsed < widget.game.maxRefes &&
+            !scoreSheet.refe &&
+            scoreSheet.totalScore < 0) {
           scoreSheet.refe = true;
           scoreSheet.refesUsed += 1;
           _dbHelper.updateScoreSheet(scoreSheet);
         }
 
-        RoundScore score = RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
+        RoundScore score =
+            RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
 
         score.totalScore = scoreSheet.totalScore;
         int scoreId = await _dbHelper.insertRoundScore(score);
         score.id = scoreId;
         scores.add(score);
-
       }
       widget.onRoundCreated(round, scores);
       Navigator.pop(context);
@@ -132,34 +136,14 @@ class _AddRoundPageState extends State<AddRoundPage>{
     var caller = widget.players[_selectedCaller];
     var callerScoreSheet = getScoreSheet(caller.id!);
 
-    if (callerScoreSheet.refe){
-      round.multiplier = round.multiplier*2;
+    if (callerScoreSheet.refe) {
+      round.multiplier = round.multiplier * 2;
       totalMultiplier *= 2;
 
       round.refeUsed = true;
 
       callerScoreSheet.refe = false;
       _dbHelper.updateScoreSheet(callerScoreSheet);
-      // for (var scoreSheet in widget.scoreSheets){
-      //   var position = PlayerPosition.getRelativePosition(scoreSheet.position,
-      //       callerScoreSheet.position, widget.game.noOfPlayers);
-      //
-      //   switch (position){
-      //     case PlayerPosition.left:
-      //       scoreSheet.refeLeft = false;
-      //       break;
-      //     case PlayerPosition.right:
-      //       scoreSheet.refeRight = false;
-      //       break;
-      //     case PlayerPosition.right2:
-      //       scoreSheet.refeRight2 = false;
-      //       break;
-      //     default:
-      //       break;
-      //   }
-      //
-      //   _dbHelper.updateScoreSheet(scoreSheet);
-      // }
     }
 
     var roundId = await _dbHelper.insertRound(round);
@@ -169,58 +153,51 @@ class _AddRoundPageState extends State<AddRoundPage>{
     //bool passed = callerPoints >= 6;
 
     List<bool> passed = [];
-    for (int i = 0; i < _played.length; i++){
+    for (int i = 0; i < _played.length; i++) {
       if (!_played[i]) {
         passed.add(true);
-      }
-      else if (i == _selectedCaller) {
-        if(_selectedContract != 6) {
+      } else if (i == _selectedCaller) {
+        if (_selectedContract != 6) {
           passed.add(callerPoints >= 6);
-        }
-        else {
+        } else {
           passed.add(callerPoints < 1);
         }
-      }
-      else if (_multiplier == 2 || _multiplier == 8){
+      } else if (_multiplier == 2 || _multiplier == 8) {
         round.kontra = true;
-        if (_selectedContract == 6){
+        if (_selectedContract == 6) {
           passed.add(callerPoints > 0);
-        }
-        else{
+        } else {
           passed.add(callerPoints < 6);
         }
-      }
-      else if(_selectedContract == 6){
+      } else if (_selectedContract == 6) {
         passed.add(true);
-      }
-      else if (callerPoints <= 6){
+      } else if (callerPoints <= 6) {
         passed.add(true);
-      }
-      else if (_pozvanDrugi) {
+      } else if (_pozvanDrugi) {
         passed.add(callerPoints <= 6);
-      }
-      else{
+      } else {
         int playerPoints = int.parse(_pointsControllers[i].text);
         passed.add(playerPoints >= 2);
       }
     }
 
     int contractValue;
-    if (!passed.any((item) => item == false)){
-      contractValue = min(totalMultiplier * (_selectedContract + (_isGame ? 1 : 0)),
+    if (!passed.any((item) => item == false)) {
+      contractValue = min(
+          totalMultiplier * (_selectedContract + (_isGame ? 1 : 0)),
           widget.maxContract);
     } else {
       contractValue = totalMultiplier * (_selectedContract + (_isGame ? 1 : 0));
     }
 
-
     List<RoundScore> scores = [];
 
-    for (int i = 0; i < widget.scoreSheets.length; i++){
+    for (int i = 0; i < widget.scoreSheets.length; i++) {
       var scoreSheet = widget.scoreSheets[i];
-      RoundScore score = RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
+      RoundScore score =
+          RoundScore(roundId: roundId, scoreSheetId: scoreSheet.id!);
 
-      if (!_played[i] || _selectedContract == 0){
+      if (!_played[i] || _selectedContract == 0) {
         score.totalScore = scoreSheet.totalScore;
         int scoreId = await _dbHelper.insertRoundScore(score);
         score.id = scoreId;
@@ -228,12 +205,15 @@ class _AddRoundPageState extends State<AddRoundPage>{
         continue;
       }
 
-      var callerPosition = PlayerPosition.getRelativePosition(scoreSheet.position,
-          callerScoreSheet.position, widget.game.noOfPlayers);
-      int soup = _selectedContract != 6 ?
-        min(contractValue * int.parse(_pointsControllers[i].text), contractValue * 5)
-        : (passed[_selectedCaller] ? 0 : contractValue * 5);
-      switch (callerPosition){
+      var callerPosition = PlayerPosition.getRelativePosition(
+          scoreSheet.position,
+          callerScoreSheet.position,
+          widget.game.noOfPlayers);
+      int soup = _selectedContract != 6
+          ? min(contractValue * int.parse(_pointsControllers[i].text),
+              contractValue * 5)
+          : (passed[_selectedCaller] ? 0 : contractValue * 5);
+      switch (callerPosition) {
         case PlayerPosition.left:
           score.leftSoup = soup;
           break;
@@ -249,7 +229,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
       }
       if (!passed[i]) score.score = -contractValue;
 
-      if (score.score != null){
+      if (score.score != null) {
         score.totalScore = scoreSheet.totalScore + score.score!;
       } else {
         score.totalScore = scoreSheet.totalScore;
@@ -266,16 +246,17 @@ class _AddRoundPageState extends State<AddRoundPage>{
         scoreSheet.totalScore += score.score!;
       }
 
-      if (score.leftSoup != null){
+      if (score.leftSoup != null) {
         scoreSheet.leftSoupTotal += score.leftSoup!;
       }
 
-      if (score.rightSoup != null){
+      if (score.rightSoup != null) {
         scoreSheet.rightSoupTotal += score.rightSoup!;
       }
 
-      if (score.rightSoup2 != null && widget.game.noOfPlayers == 4){
-        scoreSheet.rightSoupTotal2 = scoreSheet.rightSoupTotal2! + score.rightSoup2!;
+      if (score.rightSoup2 != null && widget.game.noOfPlayers == 4) {
+        scoreSheet.rightSoupTotal2 =
+            scoreSheet.rightSoupTotal2! + score.rightSoup2!;
       }
 
       _dbHelper.updateScoreSheet(scoreSheet);
@@ -288,19 +269,18 @@ class _AddRoundPageState extends State<AddRoundPage>{
     Navigator.pop(context);
   }
 
-  ScoreSheet getScoreSheet(int playerId){
+  ScoreSheet getScoreSheet(int playerId) {
     return widget.scoreSheets.firstWhere((x) => x.playerId == playerId);
   }
 
-  void _setCallerPoints([int index = -1]){
+  void _setCallerPoints([int index = -1]) {
     if (_selectedCaller == -1 || index == _selectedCaller) return;
 
     int total = 0;
-    for (int i = 0; i < _pointsControllers.length; i++){
+    for (int i = 0; i < _pointsControllers.length; i++) {
       if (i == _selectedCaller) continue;
-      var points = (_played[i])
-          ? int.tryParse(_pointsControllers[i].text) ?? 0
-          : 0;
+      var points =
+          (_played[i]) ? int.tryParse(_pointsControllers[i].text) ?? 0 : 0;
       total += points;
     }
     setState(() {
@@ -311,7 +291,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
 
   @override
   void dispose() {
-    for (var controller in _pointsControllers){
+    for (var controller in _pointsControllers) {
       controller.dispose();
     }
     super.dispose();
@@ -321,7 +301,8 @@ class _AddRoundPageState extends State<AddRoundPage>{
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingRound == null ?  'Nova runda' : 'Uredi rundu'),
+        title:
+            Text(widget.existingRound == null ? 'Nova runda' : 'Uredi rundu'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -329,34 +310,53 @@ class _AddRoundPageState extends State<AddRoundPage>{
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Štihovi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
-              const SizedBox(height: 16.0,),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  children: [
-                    SizedBox(width:  5,),
-                    Text('Zvao', style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(width: 16,),
-                    Text('Došao', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
+              const Text(
+                'Zvanja',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
-              Form(
-                key: _formKey,
-                child: _playersColumn(),
+              const SizedBox(
+                height: 20.0,
               ),
-              if (_pointsError != null) ...[
-                const SizedBox(height: 8,),
-                Text(
-                  _pointsError!,
-                  style: const TextStyle(color: Colors.red, fontSize: 14.0),
-                ),
-              ],
-              const SizedBox(height: 40,),
-              const Text('Zvanja', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
-              const SizedBox(height: 20.0,),
               _contractWrap(),
+              const SizedBox(
+                height: 50.0,
+              ),
+              ClipRect(
+                child: AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    child: _selectedContract > 0
+                        ? Column(
+                            children: [
+                              const Text(
+                                'Štihovi',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 18),
+                              ),
+                              const SizedBox(
+                                height: 20,
+                              ),
+                              Form(
+                                key: _formKey,
+                                child: _playersColumn(context),
+                              ),
+                              if (_pointsError != null) ...[
+                                const SizedBox(
+                                  height: 8,
+                                ),
+                                Text(
+                                  _pointsError!,
+                                  style: const TextStyle(
+                                      color: Colors.red, fontSize: 14.0),
+                                ),
+                              ],
+                              const SizedBox(
+                                height: 40,
+                              ),
+                            ],
+                          )
+                        : const SizedBox.shrink()),
+              ),
             ],
           ),
         ),
@@ -367,7 +367,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             TextButton(
-              onPressed: (){
+              onPressed: () {
                 Navigator.pop(context);
               },
               child: const Text('Odustani'),
@@ -384,11 +384,45 @@ class _AddRoundPageState extends State<AddRoundPage>{
     );
   }
 
-  Widget _playersColumn() {
-    return Column(
-      children: List.generate(3, (index) {
-        return _playersRow(index);
-      }),
+  Widget _playersColumn(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          children: List.generate(3, (index) {
+            return PlayerCard(
+              key: ValueKey('player_$index'),
+              player: widget.players[index],
+              isCaller: _selectedCaller == index,
+              played: _played[index],
+              showPoints: _selectedContract != 6,
+              refe: widget.scoreSheets[index].refe,
+              pointsController: _pointsControllers[index],
+              onMakeCaller: () {
+                setState(() {
+                  _selectedCaller = index;
+                  _played[index] = true;
+                });
+                _setCallerPoints();
+              },
+              onTogglePlayed: () {
+                setState(() {
+                  _played[index] = !_played[index];
+                  if (!_played[index]) _pointsControllers[index].text = '0';
+                });
+                _setCallerPoints(index);
+              },
+              onPointsChanged: (v) {
+                if (index != _selectedCaller) {
+                  _setCallerPoints(index);           // same as your onChanged branch
+                }
+              },
+            );
+          }),
+        ),
+      ),
     );
   }
 
@@ -403,9 +437,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
             int caller = value ?? -1;
             setState(() {
               _selectedCaller = caller;
-              if (caller != -1){
+              if (caller != -1) {
                 _played[index] = true;
-              } else{
+              } else {
                 _selectedContract = 0;
                 _played = List.filled(_played.length, false);
               }
@@ -422,51 +456,51 @@ class _AddRoundPageState extends State<AddRoundPage>{
                     _played[index] = value!;
                   });
                   _setCallerPoints();
-              },
+                },
         ),
         Expanded(
           child: TextFormField(
             controller: _pointsControllers[index],
             decoration: InputDecoration(
-              labelText: '${widget.players[index].name} štihovi'
-            ),
+                labelText: '${widget.players[index].name} štihovi'),
             enabled: _played[index],
             keyboardType: TextInputType.number,
             onChanged: (value) {
-              if (index != _selectedCaller){
+              if (index != _selectedCaller) {
                 _setCallerPoints(index);
               }
             },
             validator: (value) {
               if (!_played[index] || _selectedContract == 0) return null;
 
-              if ((value == null || value.trim().isEmpty)){
+              if ((value == null || value.trim().isEmpty)) {
                 return 'Unesite broj štihova';
               }
               try {
                 int n = int.parse(value);
-                if (n < 0 || n > 10){
+                if (n < 0 || n > 10) {
                   return 'Ilegalan broj štihova';
                 }
-              } catch (e){
+              } catch (e) {
                 return 'Nije unesen broj';
               }
               return null;
             },
-            onTapOutside: (_) => {
-              FocusManager.instance.primaryFocus?.unfocus()
-            },
+            onTapOutside: (_) =>
+                {FocusManager.instance.primaryFocus?.unfocus()},
           ),
         ),
         if (widget.scoreSheets[index].refe) ...[
-          const SizedBox(width: 8,),
+          const SizedBox(
+            width: 8,
+          ),
           Icon(MdiIcons.triangleOutline),
         ]
       ],
     );
   }
 
-  Widget _contractWrap(){
+  Widget _contractWrap() {
     return Wrap(
       spacing: 8.0,
       runSpacing: 8.0,
@@ -481,7 +515,9 @@ class _AddRoundPageState extends State<AddRoundPage>{
                   _cardColorWidget(color.key, color.value),
               ],
             ),
-            const SizedBox(height: 16.0,),
+            const SizedBox(
+              height: 16.0,
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -491,11 +527,13 @@ class _AddRoundPageState extends State<AddRoundPage>{
             ),
           ],
         ),
-
-        const SizedBox(height: 16,),
+        const SizedBox(
+          height: 16,
+        ),
         _isGameWidget(),
-
-        const SizedBox(height: 16,),
+        const SizedBox(
+          height: 16,
+        ),
         Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -509,7 +547,7 @@ class _AddRoundPageState extends State<AddRoundPage>{
       ],
     );
   }
-  
+
   Widget _cardColorWidget(String color, int value) {
     return GestureDetector(
       onTap: () {
@@ -525,106 +563,103 @@ class _AddRoundPageState extends State<AddRoundPage>{
               width: _selectedContract == value ? 60 : 50,
               height: _selectedContract == value ? 60 : 50,
               decoration: _selectedContract == value
-                ? BoxDecoration(
-                    border: Border.all(
-                      color: Colors.blue,
-                      width: 2,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        spreadRadius: 2,
-                        offset: Offset(0, 3),
-                      )
-                    ],
-                ) : null,
+                  ? BoxDecoration(
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                          offset: Offset(0, 3),
+                        )
+                      ],
+                    )
+                  : null,
               child: Image.asset(
                 'assets/karte/$color.png',
                 fit: BoxFit.contain,
               ),
             ),
-
-            Text('(${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
+            Text(
+                '(${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
           ],
         ),
       ),
     );
   }
 
-  Widget _otherGameWidget(String game, int value){
+  Widget _otherGameWidget(String game, int value) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedContract = value;
-          if (value == 0){
-            _selectedCaller = -1;
-            _played = List.filled(3, false);
-          }
-          else if (value == 6){
-            _played = List.filled(3, true);
-          }
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
-        child: Container(
-          padding:  EdgeInsets.all(_selectedContract == value ? 12 : 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: _selectedContract == value
-                  ? Colors.blue
-                  : Colors.grey,
-              width: _selectedContract == value
-                ? 2
-                : 1,
+        onTap: () {
+          setState(() {
+            _selectedContract = value;
+            if (value == 0) {
+              _selectedCaller = -1;
+              _played = List.filled(3, false);
+            } else if (value == 6) {
+              _played = List.filled(3, true);
+            }
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
+          child: Container(
+            padding: EdgeInsets.all(_selectedContract == value ? 12 : 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _selectedContract == value ? Colors.blue : Colors.grey,
+                width: _selectedContract == value ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(8.0),
+              boxShadow: _selectedContract == value
+                  ? [
+                      const BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 6,
+                        spreadRadius: 2,
+                        offset: Offset(0, 3),
+                      )
+                    ]
+                  : null,
             ),
-            borderRadius: BorderRadius.circular(8.0),
-            boxShadow: _selectedContract == value
-              ? [
-                const BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 6,
-                  spreadRadius: 2,
-                  offset: Offset(0, 3),
-                )
-                ] : null,
+            child: Text(
+                '$game (${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
           ),
-          child: Text('$game (${(value + (_isGame && value != 0 ? 1 : 0)) * _multiplier})'),
-        ),
-      )
-    );
+        ));
   }
 
-  Widget _isGameWidget(){
+  Widget _isGameWidget() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Checkbox(
-          value: _isGame,
-          onChanged: (value){
-            setState(() {
-              _isGame = value!;
-            });
-          }
-        ),
+            value: _isGame,
+            onChanged: (value) {
+              setState(() {
+                _isGame = value!;
+              });
+            }),
         const Text('Igra?'),
-        const SizedBox(width: 24.0,),
+        const SizedBox(
+          width: 24.0,
+        ),
         Checkbox(
             value: _pozvanDrugi,
-            onChanged: (value){
+            onChanged: (value) {
               setState(() {
                 _pozvanDrugi = value!;
               });
-            }
-        ),
+            }),
         const Text('Pozvan drugi?'),
       ],
     );
   }
 
-  Widget _kontraWidget(String kontra, int value){
+  Widget _kontraWidget(String kontra, int value) {
     return GestureDetector(
         onTap: () {
           setState(() {
@@ -637,27 +672,215 @@ class _AddRoundPageState extends State<AddRoundPage>{
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               border: Border.all(
-                color: _multiplier == value
-                    ? Colors.blue
-                    : Colors.grey,
-                width: _multiplier == value
-                    ? 2
-                    : 1,
+                color: _multiplier == value ? Colors.blue : Colors.grey,
+                width: _multiplier == value ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(8.0),
               boxShadow: _multiplier == value
                   ? [
-                const BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 6,
-                  spreadRadius: 2,
-                  offset: Offset(0, 3),
-                )
-              ] : null,
+                      const BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 6,
+                        spreadRadius: 2,
+                        offset: Offset(0, 3),
+                      )
+                    ]
+                  : null,
             ),
             child: Text('$kontra (x$value)'),
           ),
-        )
+        ));
+  }
+}
+
+class PlayerCard extends StatelessWidget {
+  final Player player;
+  final bool isCaller; // _selectedCaller == index
+  final bool played; // _played[index]
+  final bool showPoints; // betl
+  final bool refe;
+  final TextEditingController pointsController; // _pointsControllers[index]
+  final VoidCallback onMakeCaller;
+  final VoidCallback onTogglePlayed;
+  final ValueChanged<String>? onPointsChanged;
+
+  const PlayerCard({
+    super.key,
+    required this.player,
+    required this.isCaller,
+    required this.played,
+    required this.showPoints,
+    required this.refe,
+    required this.pointsController,
+    required this.onMakeCaller,
+    required this.onTogglePlayed,
+    this.onPointsChanged
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: isCaller
+          ? cs.secondaryContainer.withOpacity(0.18)
+          : Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+              color: isCaller ? cs.secondary : cs.outlineVariant, width: 1.2)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(context),
+            const SizedBox(
+              height: 12,
+            ),
+            _buildActions(context),
+            _buildPointsField(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Icon(
+          isCaller ? Icons.emoji_events : Icons.person_outline_outlined,
+          size: 18,
+          color: isCaller ? cs.secondary : cs.onSurfaceVariant,
+        ),
+        const SizedBox(
+          width: 6,
+        ),
+        Expanded(
+          child: Text(player.name, style: Theme.of(context).textTheme.titleMedium),
+        ),
+        if (refe) ...[
+          const SizedBox(width: 8,),
+          Icon (MdiIcons.triangleOutline, size: 18, color: cs.onSurfaceVariant,)
+        ],
+        if (isCaller) ...[
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+                color: cs.secondaryContainer,
+                borderRadius: BorderRadius.circular(999)),
+            child: Text(
+              'Pozivatelj',
+              style: TextStyle(color: cs.onSecondaryContainer),
+            ),
+          )]
+      ],
+    );
+  }
+
+  Widget _buildActions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (isCaller) return const SizedBox(height: 4,);
+
+    if (isCaller) {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: () {},
+          style: FilledButton.styleFrom(
+            backgroundColor: cs.primaryContainer,
+            foregroundColor: cs.onPrimaryContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text('Zvao'),
+        ),
+      );
+    }
+
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: onMakeCaller,
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Zvao'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: played
+              ? FilledButton(
+            onPressed: onTogglePlayed,
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.primaryContainer,
+              foregroundColor: cs.onPrimaryContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Došao'),
+          )
+              : OutlinedButton(
+            onPressed: onTogglePlayed,
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Nije došao'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPointsField() {
+    return ClipRect(
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        child: (showPoints && played)
+            ? Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: TextFormField(
+                  controller: pointsController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Štihovi',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => onPointsChanged?.call(v),
+                  validator: (value) {
+                    if (!(showPoints && played)) return null;
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Unesite broj štihova';
+                    }
+                    final n = int.tryParse(value);
+                    if (n == null) return 'Nije unesen broj';
+                    if (n < 0 || n > 10) return 'Ilegalan broj štihova';
+                    return null;
+                  },
+                  onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                ),
+              )
+            : const SizedBox.shrink(),
+      ),
     );
   }
 }

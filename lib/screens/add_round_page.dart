@@ -52,7 +52,6 @@ class _AddRoundPageState extends State<AddRoundPage> {
   bool _showToolbarHint = false;
   final GlobalKey _toolbarKey = GlobalKey();
   static const _toolbarHeight = 48.0;
-  bool? _lastVis;
 
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
@@ -1039,7 +1038,6 @@ class PlayerCard extends StatelessWidget {
   Widget _buildPointsField() {
     final toolbarBox =
         toolbarKey.currentContext?.findRenderObject() as RenderBox?;
-    final toolbarH = toolbarBox?.size.height ?? 0;
 
     return ClipRect(
       child: AnimatedSize(

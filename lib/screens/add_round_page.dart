@@ -41,11 +41,13 @@ class _AddRoundPageState extends State<AddRoundPage> {
   int _selectedContract = -1;
   final List<TextEditingController> _pointsControllers =
       List.generate(3, (_) => TextEditingController());
+  final List<FocusNode> _pointsFocusNodes = List.generate(3, (_) => FocusNode());
   bool _isGame = false;
   int _multiplier = 1;
   bool _pozvanDrugi = false;
-
+  bool? _passedBetl;
   String? _pointsError;
+  final GlobalKey _toolbarKey = GlobalKey();
 
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
@@ -65,7 +67,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
 
     int totalPoints = 0;
     for (int i = 0; i < 3; i++) {
-      if (_played[i]) totalPoints += int.parse(_pointsControllers[i].text);
+      if (_played[i]) totalPoints += int.tryParse(_pointsControllers[i].text) ?? 0;
     }
     if (_selectedContract == -1) {
       setState(() {
@@ -73,7 +75,22 @@ class _AddRoundPageState extends State<AddRoundPage> {
       });
       return;
     }
-    if (totalPoints != 10 && _selectedContract != 0) {
+
+    if (_selectedContract == 6 && _passedBetl == null) {
+      setState(() {
+        _pointsError = 'Odaberite prolazak/pad betla';
+      });
+      return;
+    }
+
+    if ((_multiplier == 2 || _multiplier == 8 || _pozvanDrugi) && _played.where((p) => p).length != 2) {
+      setState(() {
+        _pointsError = 'Osaberite samo jednog igrača koji je došao';
+      });
+      return;
+    }
+
+    if (totalPoints != 10 && _selectedContract != 0 && _selectedContract != 6) {
       setState(() {
         _pointsError = 'Zbroj štihova ($totalPoints) nije 10';
       });
@@ -149,7 +166,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
     var roundId = await _dbHelper.insertRound(round);
     round.id = roundId;
 
-    var callerPoints = int.parse(_pointsControllers[_selectedCaller].text);
+    var callerPoints = int.tryParse(_pointsControllers[_selectedCaller].text) ?? 0;
     //bool passed = callerPoints >= 6;
 
     List<bool> passed = [];
@@ -160,12 +177,12 @@ class _AddRoundPageState extends State<AddRoundPage> {
         if (_selectedContract != 6) {
           passed.add(callerPoints >= 6);
         } else {
-          passed.add(callerPoints < 1);
+          passed.add(_passedBetl!);
         }
       } else if (_multiplier == 2 || _multiplier == 8) {
         round.kontra = true;
         if (_selectedContract == 6) {
-          passed.add(callerPoints > 0);
+          passed.add(!_passedBetl!);
         } else {
           passed.add(callerPoints < 6);
         }
@@ -235,7 +252,21 @@ class _AddRoundPageState extends State<AddRoundPage> {
         score.totalScore = scoreSheet.totalScore;
       }
 
-      score.totalPoints = int.parse(_pointsControllers[i].text);
+      int? points = int.tryParse(_pointsControllers[i].text);
+
+      if (points == null || _selectedContract == 6) {
+        if (_selectedContract == 6) {
+          if (callerPosition == PlayerPosition.center) {
+            points = _passedBetl! ? 0 : 10;
+          } else {
+            points = _passedBetl! ? (round.kontra ? 10 : 0) : 0;
+          }
+        } else {
+          points = 0;
+        }
+      }
+
+      score.totalPoints = points;
 
       int id = await _dbHelper.insertRoundScore(score);
       score.id = id;
@@ -289,16 +320,38 @@ class _AddRoundPageState extends State<AddRoundPage> {
     });
   }
 
+  bool? _getCallerPassed() {
+    if (_selectedCaller == -1 || _pointsControllers[_selectedCaller].text.isEmpty) return null;
+    if (_selectedContract == 6) return _passedBetl;
+
+    return int.parse(_pointsControllers[_selectedCaller].text) >= 6;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    for (var node in _pointsFocusNodes) {
+      node.addListener(() {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
   @override
   void dispose() {
     for (var controller in _pointsControllers) {
       controller.dispose();
+    }
+    for (var node in _pointsFocusNodes) {
+      node.dispose();
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title:
@@ -319,7 +372,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
               ),
               _contractWrap(),
               const SizedBox(
-                height: 50.0,
+                height: 30.0,
               ),
               ClipRect(
                 child: AnimatedSize(
@@ -342,17 +395,21 @@ class _AddRoundPageState extends State<AddRoundPage> {
                               ),
                               if (_pointsError != null) ...[
                                 const SizedBox(
-                                  height: 8,
+                                  height: 12,
                                 ),
                                 Text(
                                   _pointsError!,
-                                  style: const TextStyle(
-                                      color: Colors.red, fontSize: 14.0),
+                                  style: TextStyle(
+                                      color: cs.error, fontSize: 16.0),
                                 ),
                               ],
-                              const SizedBox(
-                                height: 40,
+                              const Text(
+                                'Kontre',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 18),
                               ),
+                              const SizedBox(height: 16,),
+                              _kontraWrap()
                             ],
                           )
                         : const SizedBox.shrink()),
@@ -381,14 +438,17 @@ class _AddRoundPageState extends State<AddRoundPage> {
           ],
         ),
       ),
+      bottomSheet: _buildKeyboardToolbar(context),
     );
   }
 
   Widget _playersColumn(BuildContext context) {
+    final tbH = ( _toolbarKey.currentContext?.findRenderObject() as RenderBox? )?.size.height ?? 0;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(context).viewInsets.bottom + tbH,
         ),
         child: Column(
           children: List.generate(3, (index) {
@@ -400,18 +460,32 @@ class _AddRoundPageState extends State<AddRoundPage> {
               showPoints: _selectedContract != 6,
               refe: widget.scoreSheets[index].refe,
               pointsController: _pointsControllers[index],
+              focusNode: _pointsFocusNodes[index],
+              passed: _getCallerPassed(),
+              toolbarKey: _toolbarKey,
+              onTogglePassed: (v){
+                setState(() {
+                  _passedBetl = v;
+                });
+              },
               onMakeCaller: () {
                 setState(() {
                   _selectedCaller = index;
                   _played[index] = true;
+                  _passedBetl = null;
+                  _pointsError = null;
                 });
                 _setCallerPoints();
               },
               onTogglePlayed: () {
                 setState(() {
                   _played[index] = !_played[index];
-                  if (!_played[index]) _pointsControllers[index].text = '0';
+                  _pointsError = null;
                 });
+
+                if (_played[index] && _pointsControllers[index].text.isEmpty) {
+                  _pointsFocusNodes[index].requestFocus();
+                }
                 _setCallerPoints(index);
               },
               onPointsChanged: (v) {
@@ -423,80 +497,6 @@ class _AddRoundPageState extends State<AddRoundPage> {
           }),
         ),
       ),
-    );
-  }
-
-  Widget _playersRow(int index) {
-    return Row(
-      children: [
-        Radio(
-          value: index,
-          groupValue: _selectedCaller,
-          toggleable: true,
-          onChanged: (value) {
-            int caller = value ?? -1;
-            setState(() {
-              _selectedCaller = caller;
-              if (caller != -1) {
-                _played[index] = true;
-              } else {
-                _selectedContract = 0;
-                _played = List.filled(_played.length, false);
-              }
-            });
-            _setCallerPoints();
-          },
-        ),
-        Checkbox(
-          value: _played[index],
-          onChanged: _selectedCaller == index
-              ? null
-              : (value) {
-                  setState(() {
-                    _played[index] = value!;
-                  });
-                  _setCallerPoints();
-                },
-        ),
-        Expanded(
-          child: TextFormField(
-            controller: _pointsControllers[index],
-            decoration: InputDecoration(
-                labelText: '${widget.players[index].name} štihovi'),
-            enabled: _played[index],
-            keyboardType: TextInputType.number,
-            onChanged: (value) {
-              if (index != _selectedCaller) {
-                _setCallerPoints(index);
-              }
-            },
-            validator: (value) {
-              if (!_played[index] || _selectedContract == 0) return null;
-
-              if ((value == null || value.trim().isEmpty)) {
-                return 'Unesite broj štihova';
-              }
-              try {
-                int n = int.parse(value);
-                if (n < 0 || n > 10) {
-                  return 'Ilegalan broj štihova';
-                }
-              } catch (e) {
-                return 'Nije unesen broj';
-              }
-              return null;
-            },
-            onTapOutside: (_) =>
-                {FocusManager.instance.primaryFocus?.unfocus()},
-          ),
-        ),
-        if (widget.scoreSheets[index].refe) ...[
-          const SizedBox(
-            width: 8,
-          ),
-          Icon(MdiIcons.triangleOutline),
-        ]
-      ],
     );
   }
 
@@ -531,19 +531,19 @@ class _AddRoundPageState extends State<AddRoundPage> {
           height: 16,
         ),
         _isGameWidget(),
-        const SizedBox(
-          height: 16,
-        ),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (var kontra in _kontre.entries)
-              _kontraWidget(kontra.key, kontra.value),
-          ],
-        ),
+      ],
+    );
+  }
+
+  Widget _kontraWrap() {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (var kontra in _kontre.entries)
+          _kontraWidget(kontra.key, kontra.value),
       ],
     );
   }
@@ -553,6 +553,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
       onTap: () {
         setState(() {
           _selectedContract = value;
+          _pointsError = null;
+          _passedBetl = null;
         });
       },
       child: Padding(
@@ -597,11 +599,11 @@ class _AddRoundPageState extends State<AddRoundPage> {
         onTap: () {
           setState(() {
             _selectedContract = value;
+            _pointsError = null;
+            _passedBetl = null;
             if (value == 0) {
               _selectedCaller = -1;
               _played = List.filled(3, false);
-            } else if (value == 6) {
-              _played = List.filled(3, true);
             }
           });
         },
@@ -691,6 +693,73 @@ class _AddRoundPageState extends State<AddRoundPage> {
           ),
         ));
   }
+
+  int? _prevIndex(int from) {
+    for (int i = from - 1; i >= 0; i--) {
+      if (i != _selectedCaller && _played[i]) return i;
+    }
+    return null;
+  }
+  int? _nextIndex(int from) {
+    for (int i = from + 1; i < _pointsFocusNodes.length; i++) {
+      if (i != _selectedCaller && _played[i]) return i;
+    }
+    return null;
+  }
+
+  Widget _buildKeyboardToolbar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    final kbOpen = viewInsets > 0;
+    final current = _pointsFocusNodes.indexWhere((n) => n.hasFocus);
+    final hasFocus = current != -1;
+    final int? prev = current == -1 ? null : _prevIndex(current);
+    final int? next = current == -1 ? null : _nextIndex(current);
+
+    return Offstage(
+      offstage: !(kbOpen && hasFocus),
+      child: Material(
+        key: _toolbarKey,
+        elevation: 3,
+        color: cs.surface,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Previous',
+                onPressed: (prev != null)
+                    ? () => _pointsFocusNodes[prev].requestFocus()
+                    : null,
+                icon: const Icon(Icons.arrow_left),
+                color: cs.primary,
+              ),
+              IconButton(
+                tooltip: 'Next',
+                onPressed: (next != null)
+                    ? () => _pointsFocusNodes[next].requestFocus()
+                    : null,
+                icon: const Icon(Icons.arrow_right),
+                color: cs.primary,
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => FocusScope.of(context).unfocus(),
+                icon: const Icon(Icons.keyboard_hide),
+                label: const Text('Done'),
+                style: TextButton.styleFrom(foregroundColor: cs.primary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 }
 
 class PlayerCard extends StatelessWidget {
@@ -703,6 +772,10 @@ class PlayerCard extends StatelessWidget {
   final VoidCallback onMakeCaller;
   final VoidCallback onTogglePlayed;
   final ValueChanged<String>? onPointsChanged;
+  final FocusNode focusNode;
+  final bool? passed;
+  final ValueChanged<bool> onTogglePassed;
+  final GlobalKey toolbarKey;
 
   const PlayerCard({
     super.key,
@@ -714,23 +787,40 @@ class PlayerCard extends StatelessWidget {
     required this.pointsController,
     required this.onMakeCaller,
     required this.onTogglePlayed,
-    this.onPointsChanged
+    this.onPointsChanged,
+    required this.focusNode,
+    required this.passed,
+    required this.onTogglePassed,
+    required this.toolbarKey,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    final isCallerRefetl = isCaller && refe;
+
+    final cardBg = isCallerRefetl
+        ? cs.tertiaryContainer.withOpacity(Theme.of(context).brightness == Brightness.dark ? .25 : .18)
+        : (isCaller
+        ? cs.secondaryContainer.withOpacity(.18)
+        : Theme.of(context).cardColor);
+
+    final borderColor = isCallerRefetl
+        ? cs.tertiary
+        : (isCaller ? cs.secondary : cs.outlineVariant);
+
+    final borderWidth = isCallerRefetl ? 1.8 : 1.2;
+    final elev = isCallerRefetl ? 2.0 : 0.0;
+
     return Card(
-      elevation: 0,
+      elevation: elev,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      color: isCaller
-          ? cs.secondaryContainer.withOpacity(0.18)
-          : Theme.of(context).cardColor,
+      color: cardBg,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-              color: isCaller ? cs.secondary : cs.outlineVariant, width: 1.2)),
+              color: borderColor, width: borderWidth)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -740,12 +830,25 @@ class PlayerCard extends StatelessWidget {
             const SizedBox(
               height: 12,
             ),
-            _buildActions(context),
-            _buildPointsField(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isCaller) ...[
+                  Expanded(flex: 1, child: _buildActions(context)),
+                  const SizedBox(width: 10),
+                ],
+                isCaller && showPoints
+                    ? Expanded(child: _buildPointsField())
+                    : Flexible(flex: 0, child: _buildPointsField()),
+              ],
+            ),
+            if (isCaller && !showPoints)
+              _buildBetlField(context),
           ],
         ),
       ),
     );
+
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -754,7 +857,12 @@ class PlayerCard extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          isCaller ? Icons.emoji_events : Icons.person_outline_outlined,
+          isCaller
+              ? ((passed == null || passed == true)
+                  ? Icons.emoji_events
+                  : Icons.sentiment_dissatisfied_outlined
+                )
+              : Icons.person_outline_outlined,
           size: 18,
           color: isCaller ? cs.secondary : cs.onSurfaceVariant,
         ),
@@ -762,9 +870,17 @@ class PlayerCard extends StatelessWidget {
           width: 6,
         ),
         Expanded(
-          child: Text(player.name, style: Theme.of(context).textTheme.titleMedium),
+          child: Row(
+            children: [
+              Text(player.name, style: Theme.of(context).textTheme.titleMedium),
+              if (refe && isCaller) ...[
+                const SizedBox(width: 6),
+                Icon(MdiIcons.triangleOutline, size: 18, color: cs.onSurfaceVariant),
+              ],
+            ],
+          ),
         ),
-        if (refe) ...[
+        if (refe && !isCaller) ...[
           const SizedBox(width: 8,),
           Icon (MdiIcons.triangleOutline, size: 18, color: cs.onSurfaceVariant,)
         ],
@@ -788,24 +904,6 @@ class PlayerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     if (isCaller) return const SizedBox(height: 4,);
-
-    if (isCaller) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: () {},
-          style: FilledButton.styleFrom(
-            backgroundColor: cs.primaryContainer,
-            foregroundColor: cs.onPrimaryContainer,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: const Text('Zvao'),
-        ),
-      );
-    }
-
 
     return Row(
       children: [
@@ -849,21 +947,25 @@ class PlayerCard extends StatelessWidget {
   }
 
   Widget _buildPointsField() {
+    final toolbarBox = toolbarKey.currentContext?.findRenderObject() as RenderBox?;
+    final toolbarH = toolbarBox?.size.height ?? 0;
+
     return ClipRect(
       child: AnimatedSize(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeInOut,
         child: (showPoints && played)
-            ? Padding(
-                padding: const EdgeInsets.only(top: 12),
+            ? SizedBox(
+                width: 80,
                 child: TextFormField(
+                  scrollPadding: EdgeInsets.only(bottom: toolbarH + 24),
+                  focusNode: focusNode,
                   controller: pointsController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: const InputDecoration(
                     labelText: 'Štihovi',
                     isDense: true,
-                    border: OutlineInputBorder(),
                   ),
                   onChanged: (v) => onPointsChanged?.call(v),
                   validator: (value) {
@@ -876,11 +978,68 @@ class PlayerCard extends StatelessWidget {
                     if (n < 0 || n > 10) return 'Ilegalan broj štihova';
                     return null;
                   },
-                  onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                  onTapOutside: (event) {
+                    final toolbarBox = toolbarKey.currentContext?.findRenderObject() as RenderBox?;
+                    if (toolbarBox != null) {
+                      final offset = toolbarBox.localToGlobal(Offset.zero);
+                      final rect = offset & toolbarBox.size;
+                      if (rect.contains(event.position)) {
+                        return;
+                      }
+                    }
+
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  },
                 ),
-              )
+            )
             : const SizedBox.shrink(),
       ),
+    );
+  }
+
+  Widget _buildBetlField(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () => onTogglePassed(true),
+            icon: const Icon(Icons.check_circle_outline_rounded),
+            label: const Text('Prošao'),
+            style: FilledButton.styleFrom(
+              backgroundColor: passed == true
+                  ? cs.primaryContainer
+                  : cs.surface,
+              foregroundColor: passed == true
+                  ? cs.onPrimaryContainer
+                  : cs.onSurfaceVariant,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+          ),
+        )
+      ),
+        const SizedBox(width: 10,),
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () => onTogglePassed(false),
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('Pao'),
+            style: FilledButton.styleFrom(
+              backgroundColor: passed == false
+                  ? cs.errorContainer
+                  : cs.surface,
+              foregroundColor: passed == false
+                  ? cs.onErrorContainer
+                  : cs.onSurfaceVariant,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

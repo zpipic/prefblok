@@ -388,9 +388,18 @@ class _HomePageState extends State<Homepage> {
 
   Widget _buildFilterSummary() {
     if (_activeQuery == null) {
-      return const Padding(
-        padding: EdgeInsets.all(8),
-        child: Text("Prikazuju se sve partije"),
+      return Align(
+        alignment: Alignment.center,
+        child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+                "Prikazuju se sve partije",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+            ),
+        ),
       );
     }
 

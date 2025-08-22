@@ -7,7 +7,6 @@ import '../enums/player_position.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class AddRoundPage extends StatefulWidget {
   Game game;
   List<ScoreSheet> scoreSheets;
@@ -43,7 +42,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
   int _selectedContract = -1;
   final List<TextEditingController> _pointsControllers =
       List.generate(3, (_) => TextEditingController());
-  final List<FocusNode> _pointsFocusNodes = List.generate(3, (_) => FocusNode());
+  final List<FocusNode> _pointsFocusNodes =
+      List.generate(3, (_) => FocusNode());
   bool _isGame = false;
   int _multiplier = 1;
   bool _pozvanDrugi = false;
@@ -51,6 +51,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
   String? _pointsError;
   bool _showToolbarHint = false;
   final GlobalKey _toolbarKey = GlobalKey();
+  static const _toolbarHeight = 48.0;
+  bool? _lastVis;
 
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
@@ -64,13 +66,15 @@ class _AddRoundPageState extends State<AddRoundPage> {
   };
 
   void _saveGame() async {
-    if ((_formKey.currentState == null || !_formKey.currentState!.validate()) && _selectedContract != 0) {
+    if ((_formKey.currentState == null || !_formKey.currentState!.validate()) &&
+        _selectedContract != 0) {
       return;
     }
 
     int totalPoints = 0;
     for (int i = 0; i < 3; i++) {
-      if (_played[i]) totalPoints += int.tryParse(_pointsControllers[i].text) ?? 0;
+      if (_played[i])
+        totalPoints += int.tryParse(_pointsControllers[i].text) ?? 0;
     }
     if (_selectedContract == -1) {
       setState(() {
@@ -86,7 +90,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
       return;
     }
 
-    if ((_multiplier == 2 || _multiplier == 8 || _pozvanDrugi) && _played.where((p) => p).length != 2) {
+    if ((_multiplier == 2 || _multiplier == 8 || _pozvanDrugi) &&
+        _played.where((p) => p).length != 2) {
       setState(() {
         _pointsError = 'Osaberite samo jednog igrača koji je došao';
       });
@@ -169,7 +174,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
     var roundId = await _dbHelper.insertRound(round);
     round.id = roundId;
 
-    var callerPoints = int.tryParse(_pointsControllers[_selectedCaller].text) ?? 0;
+    var callerPoints =
+        int.tryParse(_pointsControllers[_selectedCaller].text) ?? 0;
     //bool passed = callerPoints >= 6;
 
     List<bool> passed = [];
@@ -324,7 +330,8 @@ class _AddRoundPageState extends State<AddRoundPage> {
   }
 
   bool? _getCallerPassed() {
-    if (_selectedCaller == -1 || _pointsControllers[_selectedCaller].text.isEmpty) return null;
+    if (_selectedCaller == -1 ||
+        _pointsControllers[_selectedCaller].text.isEmpty) return null;
     if (_selectedContract == 6) return _passedBetl;
 
     return int.parse(_pointsControllers[_selectedCaller].text) >= 6;
@@ -335,7 +342,11 @@ class _AddRoundPageState extends State<AddRoundPage> {
     super.initState();
     for (var node in _pointsFocusNodes) {
       node.addListener(() {
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() {
+
+          });
+        }
       });
     }
     SharedPreferences.getInstance().then((p) {
@@ -384,7 +395,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
               ),
               ClipRect(
                 child: AnimatedSize(
-                    duration: const Duration(milliseconds: 250),
+                    duration: const Duration(milliseconds: 150),
                     curve: Curves.easeInOut,
                     child: _selectedContract > 0
                         ? Column(
@@ -411,12 +422,15 @@ class _AddRoundPageState extends State<AddRoundPage> {
                                       color: cs.error, fontSize: 16.0),
                                 ),
                               ],
+                              const SizedBox(height: 20,),
                               const Text(
                                 'Kontre',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 18),
                               ),
-                              const SizedBox(height: 16,),
+                              const SizedBox(
+                                height: 16,
+                              ),
                               _kontraWrap()
                             ],
                           )
@@ -458,60 +472,51 @@ class _AddRoundPageState extends State<AddRoundPage> {
   }
 
   Widget _playersColumn(BuildContext context) {
-    final tbH = ( _toolbarKey.currentContext?.findRenderObject() as RenderBox? )?.size.height ?? 0;
+    return Column(
+      children: List.generate(3, (index) {
+        return PlayerCard(
+          key: ValueKey('player_$index'),
+          player: widget.players[index],
+          isCaller: _selectedCaller == index,
+          played: _played[index],
+          showPoints: _selectedContract != 6,
+          refe: widget.scoreSheets[index].refe,
+          pointsController: _pointsControllers[index],
+          focusNode: _pointsFocusNodes[index],
+          passed: _getCallerPassed(),
+          toolbarKey: _toolbarKey,
+          onTogglePassed: (v) {
+            setState(() {
+              _passedBetl = v;
+            });
+          },
+          onMakeCaller: () {
+            setState(() {
+              _selectedCaller = index;
+              _played[index] = true;
+              _passedBetl = null;
+              _pointsError = null;
+            });
+            _setCallerPoints();
+          },
+          onTogglePlayed: () {
+            setState(() {
+              _played[index] = !_played[index];
+              _pointsError = null;
+            });
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + tbH,
-        ),
-        child: Column(
-          children: List.generate(3, (index) {
-            return PlayerCard(
-              key: ValueKey('player_$index'),
-              player: widget.players[index],
-              isCaller: _selectedCaller == index,
-              played: _played[index],
-              showPoints: _selectedContract != 6,
-              refe: widget.scoreSheets[index].refe,
-              pointsController: _pointsControllers[index],
-              focusNode: _pointsFocusNodes[index],
-              passed: _getCallerPassed(),
-              toolbarKey: _toolbarKey,
-              onTogglePassed: (v){
-                setState(() {
-                  _passedBetl = v;
-                });
-              },
-              onMakeCaller: () {
-                setState(() {
-                  _selectedCaller = index;
-                  _played[index] = true;
-                  _passedBetl = null;
-                  _pointsError = null;
-                });
-                _setCallerPoints();
-              },
-              onTogglePlayed: () {
-                setState(() {
-                  _played[index] = !_played[index];
-                  _pointsError = null;
-                });
-
-                if (_played[index] && _pointsControllers[index].text.isEmpty) {
-                  _pointsFocusNodes[index].requestFocus();
-                }
-                _setCallerPoints(index);
-              },
-              onPointsChanged: (v) {
-                if (index != _selectedCaller) {
-                  _setCallerPoints(index);           // same as your onChanged branch
-                }
-              },
-            );
-          }),
-        ),
-      ),
+            if (_played[index] && _pointsControllers[index].text.isEmpty) {
+              _pointsFocusNodes[index].requestFocus();
+            }
+            _setCallerPoints(index);
+          },
+          onPointsChanged: (v) {
+            if (index != _selectedCaller) {
+              _setCallerPoints(index); // same as your onChanged branch
+            }
+          },
+        );
+      }),
     );
   }
 
@@ -715,6 +720,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
     }
     return null;
   }
+
   int? _nextIndex(int from) {
     for (int i = from + 1; i < _pointsFocusNodes.length; i++) {
       if (i != _selectedCaller && _played[i]) return i;
@@ -724,44 +730,43 @@ class _AddRoundPageState extends State<AddRoundPage> {
 
   Widget _buildKeyboardToolbar(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-    final kbOpen = viewInsets > 0;
+
+    final kbOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final hasFocus = _pointsFocusNodes.any((n) => n.hasFocus);
+    final toolbarVisible = kbOpen && hasFocus;
+
     final current = _pointsFocusNodes.indexWhere((n) => n.hasFocus);
-    final hasFocus = current != -1;
     final int? prev = current == -1 ? null : _prevIndex(current);
     final int? next = current == -1 ? null : _nextIndex(current);
 
-    if (!(kbOpen && hasFocus)) return SizedBox.shrink();
+    if (!toolbarVisible) return const SizedBox.shrink();
 
-    return Stack(
-      children: [
-        Container(
-          height: 48,
-          decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant))),
-          child: Offstage(
-            offstage: !(kbOpen && hasFocus),
-            child: GestureDetector(
-              onHorizontalDragEnd: (details) {
-                if (details.primaryVelocity == null) return;
-
-                if (details.primaryVelocity! > 0 && prev != null) {
-                  _pointsFocusNodes[prev].requestFocus();
-                } else if (details.primaryVelocity! < 0 && next != null) {
-                  _pointsFocusNodes[next].requestFocus();
-                }
-              },
-              onDoubleTap: () {
-                FocusScope.of(context).unfocus();
-              },
-              child: Material(
-                key: _toolbarKey,
-                elevation: 3,
-                color: cs.surface,
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: cs.outlineVariant)),
-                  ),
+    return IgnorePointer(
+      ignoring: !toolbarVisible,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        offset: toolbarVisible ? Offset.zero : const Offset(0, 1),
+        child: Material(
+          key: _toolbarKey,
+          elevation: 3,
+          color: cs.surface,
+          child: Stack(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: _toolbarHeight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (details) {
+                    final v = details.primaryVelocity ?? 0;
+                    if (v > 0 && prev != null) {
+                      _pointsFocusNodes[prev].requestFocus();
+                    } else if (v < 0 && next != null) {
+                      _pointsFocusNodes[next].requestFocus();
+                    }
+                  },
+                  onDoubleTap: () => FocusScope.of(context).unfocus(),
                   child: Row(
                     children: [
                       IconButton(
@@ -785,52 +790,57 @@ class _AddRoundPageState extends State<AddRoundPage> {
                         onPressed: () => FocusScope.of(context).unfocus(),
                         icon: const Icon(Icons.keyboard_hide),
                         label: const Text('Done'),
-                        style: TextButton.styleFrom(foregroundColor: cs.primary),
+                        style:
+                            TextButton.styleFrom(foregroundColor: cs.primary),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
-        if (_showToolbarHint)
-          Positioned.fill(
-          child: GestureDetector(
-            onTap: _dismissToolbarHint,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: AnimatedOpacity(
-                opacity: 1.0,
-                duration: const Duration(milliseconds: 250),
-                child: Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child:  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.swipe_rounded, size: 16, color: cs.onSurface),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Swipe to switch • Double-tap to close',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface,
-                        fontWeight: FontWeight.w500,
+              if (_showToolbarHint && toolbarVisible)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _dismissToolbarHint,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outlineVariant),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swipe_rounded,
+                                size: 16, color: cs.onSurface),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Swipe to switch • Double-tap to close',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: cs.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ]),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
-
   }
-
 }
 
 class PlayerCard extends StatelessWidget {
@@ -872,10 +882,11 @@ class PlayerCard extends StatelessWidget {
     final isCallerRefetl = isCaller && refe;
 
     final cardBg = isCallerRefetl
-        ? cs.tertiaryContainer.withOpacity(Theme.of(context).brightness == Brightness.dark ? .25 : .18)
+        ? cs.tertiaryContainer.withOpacity(
+            Theme.of(context).brightness == Brightness.dark ? .25 : .18)
         : (isCaller
-        ? cs.secondaryContainer.withOpacity(.18)
-        : Theme.of(context).cardColor);
+            ? cs.secondaryContainer.withOpacity(.18)
+            : Theme.of(context).cardColor);
 
     final borderColor = isCallerRefetl
         ? cs.tertiary
@@ -890,8 +901,7 @@ class PlayerCard extends StatelessWidget {
       color: cardBg,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-              color: borderColor, width: borderWidth)),
+          side: BorderSide(color: borderColor, width: borderWidth)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -913,13 +923,11 @@ class PlayerCard extends StatelessWidget {
                     : Flexible(flex: 0, child: _buildPointsField()),
               ],
             ),
-            if (isCaller && !showPoints)
-              _buildBetlField(context),
+            if (isCaller && !showPoints) _buildBetlField(context),
           ],
         ),
       ),
     );
-
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -931,8 +939,7 @@ class PlayerCard extends StatelessWidget {
           isCaller
               ? ((passed == null || passed == true)
                   ? Icons.emoji_events
-                  : Icons.sentiment_dissatisfied_outlined
-                )
+                  : Icons.sentiment_dissatisfied_outlined)
               : Icons.person_outline_outlined,
           size: 18,
           color: isCaller ? cs.secondary : cs.onSurfaceVariant,
@@ -946,14 +953,21 @@ class PlayerCard extends StatelessWidget {
               Text(player.name, style: Theme.of(context).textTheme.titleMedium),
               if (refe && isCaller) ...[
                 const SizedBox(width: 6),
-                Icon(MdiIcons.triangleOutline, size: 18, color: cs.onSurfaceVariant),
+                Icon(MdiIcons.triangleOutline,
+                    size: 18, color: cs.onSurfaceVariant),
               ],
             ],
           ),
         ),
         if (refe && !isCaller) ...[
-          const SizedBox(width: 8,),
-          Icon (MdiIcons.triangleOutline, size: 18, color: cs.onSurfaceVariant,)
+          const SizedBox(
+            width: 8,
+          ),
+          Icon(
+            MdiIcons.triangleOutline,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          )
         ],
         if (isCaller) ...[
           const Spacer(),
@@ -966,7 +980,8 @@ class PlayerCard extends StatelessWidget {
               'Pozivatelj',
               style: TextStyle(color: cs.onSecondaryContainer),
             ),
-          )]
+          )
+        ]
       ],
     );
   }
@@ -974,7 +989,11 @@ class PlayerCard extends StatelessWidget {
   Widget _buildActions(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    if (isCaller) return const SizedBox(height: 4,);
+    if (isCaller) {
+      return const SizedBox(
+        height: 4,
+      );
+    }
 
     return Row(
       children: [
@@ -993,43 +1012,45 @@ class PlayerCard extends StatelessWidget {
         Expanded(
           child: played
               ? FilledButton(
-            onPressed: onTogglePlayed,
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.primaryContainer,
-              foregroundColor: cs.onPrimaryContainer,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Došao'),
-          )
+                  onPressed: onTogglePlayed,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: cs.primaryContainer,
+                    foregroundColor: cs.onPrimaryContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Došao'),
+                )
               : OutlinedButton(
-            onPressed: onTogglePlayed,
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Nije došao'),
-          ),
+                  onPressed: onTogglePlayed,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Nije došao'),
+                ),
         ),
       ],
     );
   }
 
   Widget _buildPointsField() {
-    final toolbarBox = toolbarKey.currentContext?.findRenderObject() as RenderBox?;
+    final toolbarBox =
+        toolbarKey.currentContext?.findRenderObject() as RenderBox?;
     final toolbarH = toolbarBox?.size.height ?? 0;
 
     return ClipRect(
       child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 150),
         curve: Curves.easeInOut,
         child: (showPoints && played)
             ? SizedBox(
                 width: 80,
                 child: TextFormField(
-                  scrollPadding: EdgeInsets.only(bottom: toolbarH + 24),
+                  scrollPadding: const EdgeInsets.only(
+                      bottom: _AddRoundPageState._toolbarHeight + 24),
                   focusNode: focusNode,
                   controller: pointsController,
                   keyboardType: TextInputType.number,
@@ -1050,7 +1071,8 @@ class PlayerCard extends StatelessWidget {
                     return null;
                   },
                   onTapOutside: (event) {
-                    final toolbarBox = toolbarKey.currentContext?.findRenderObject() as RenderBox?;
+                    final toolbarBox = toolbarKey.currentContext
+                        ?.findRenderObject() as RenderBox?;
                     if (toolbarBox != null) {
                       final offset = toolbarBox.localToGlobal(Offset.zero);
                       final rect = offset & toolbarBox.size;
@@ -1062,7 +1084,7 @@ class PlayerCard extends StatelessWidget {
                     FocusManager.instance.primaryFocus?.unfocus();
                   },
                 ),
-            )
+              )
             : const SizedBox.shrink(),
       ),
     );
@@ -1074,36 +1096,31 @@ class PlayerCard extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: FilledButton.icon(
-            onPressed: () => onTogglePassed(true),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: const Text('Prošao'),
-            style: FilledButton.styleFrom(
-              backgroundColor: passed == true
-                  ? cs.primaryContainer
-                  : cs.surface,
-              foregroundColor: passed == true
-                  ? cs.onPrimaryContainer
-                  : cs.onSurfaceVariant,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+            child: FilledButton.icon(
+          onPressed: () => onTogglePassed(true),
+          icon: const Icon(Icons.check_circle_outline_rounded),
+          label: const Text('Prošao'),
+          style: FilledButton.styleFrom(
+            backgroundColor: passed == true ? cs.primaryContainer : cs.surface,
+            foregroundColor:
+                passed == true ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-        )
-      ),
-        const SizedBox(width: 10,),
+        )),
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: FilledButton.icon(
             onPressed: () => onTogglePassed(false),
             icon: const Icon(Icons.cancel_outlined),
             label: const Text('Pao'),
             style: FilledButton.styleFrom(
-              backgroundColor: passed == false
-                  ? cs.errorContainer
-                  : cs.surface,
-              foregroundColor: passed == false
-                  ? cs.onErrorContainer
-                  : cs.onSurfaceVariant,
+              backgroundColor: passed == false ? cs.errorContainer : cs.surface,
+              foregroundColor:
+                  passed == false ? cs.onErrorContainer : cs.onSurfaceVariant,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

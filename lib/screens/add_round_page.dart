@@ -5,6 +5,8 @@ import 'package:pref_blok/database/database_helper.dart';
 import '../models/models.dart';
 import '../enums/player_position.dart';
 import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class AddRoundPage extends StatefulWidget {
   Game game;
@@ -47,6 +49,7 @@ class _AddRoundPageState extends State<AddRoundPage> {
   bool _pozvanDrugi = false;
   bool? _passedBetl;
   String? _pointsError;
+  bool _showToolbarHint = false;
   final GlobalKey _toolbarKey = GlobalKey();
 
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -335,6 +338,11 @@ class _AddRoundPageState extends State<AddRoundPage> {
         if (mounted) setState(() {});
       });
     }
+    SharedPreferences.getInstance().then((p) {
+      if (!(p.getBool('kbToolbarHintSeen') ?? false)) {
+        setState(() => _showToolbarHint = true);
+      }
+    });
   }
 
   @override
@@ -440,6 +448,13 @@ class _AddRoundPageState extends State<AddRoundPage> {
       ),
       bottomSheet: _buildKeyboardToolbar(context),
     );
+  }
+
+  Future<void> _dismissToolbarHint() async {
+    if (!_showToolbarHint) return;
+    setState(() => _showToolbarHint = false);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('kbToolbarHintSeen', true);
   }
 
   Widget _playersColumn(BuildContext context) {
@@ -716,48 +731,104 @@ class _AddRoundPageState extends State<AddRoundPage> {
     final int? prev = current == -1 ? null : _prevIndex(current);
     final int? next = current == -1 ? null : _nextIndex(current);
 
-    return Offstage(
-      offstage: !(kbOpen && hasFocus),
-      child: Material(
-        key: _toolbarKey,
-        elevation: 3,
-        color: cs.surface,
-        child: Container(
+    if (!(kbOpen && hasFocus)) return SizedBox.shrink();
+
+    return Stack(
+      children: [
+        Container(
           height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: cs.outlineVariant)),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                tooltip: 'Previous',
-                onPressed: (prev != null)
-                    ? () => _pointsFocusNodes[prev].requestFocus()
-                    : null,
-                icon: const Icon(Icons.arrow_left),
-                color: cs.primary,
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant))),
+          child: Offstage(
+            offstage: !(kbOpen && hasFocus),
+            child: GestureDetector(
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity == null) return;
+
+                if (details.primaryVelocity! > 0 && prev != null) {
+                  _pointsFocusNodes[prev].requestFocus();
+                } else if (details.primaryVelocity! < 0 && next != null) {
+                  _pointsFocusNodes[next].requestFocus();
+                }
+              },
+              onDoubleTap: () {
+                FocusScope.of(context).unfocus();
+              },
+              child: Material(
+                key: _toolbarKey,
+                elevation: 3,
+                color: cs.surface,
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: cs.outlineVariant)),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Previous',
+                        onPressed: (prev != null)
+                            ? () => _pointsFocusNodes[prev].requestFocus()
+                            : null,
+                        icon: const Icon(Icons.arrow_left),
+                        color: cs.primary,
+                      ),
+                      IconButton(
+                        tooltip: 'Next',
+                        onPressed: (next != null)
+                            ? () => _pointsFocusNodes[next].requestFocus()
+                            : null,
+                        icon: const Icon(Icons.arrow_right),
+                        color: cs.primary,
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => FocusScope.of(context).unfocus(),
+                        icon: const Icon(Icons.keyboard_hide),
+                        label: const Text('Done'),
+                        style: TextButton.styleFrom(foregroundColor: cs.primary),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              IconButton(
-                tooltip: 'Next',
-                onPressed: (next != null)
-                    ? () => _pointsFocusNodes[next].requestFocus()
-                    : null,
-                icon: const Icon(Icons.arrow_right),
-                color: cs.primary,
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => FocusScope.of(context).unfocus(),
-                icon: const Icon(Icons.keyboard_hide),
-                label: const Text('Done'),
-                style: TextButton.styleFrom(foregroundColor: cs.primary),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+        if (_showToolbarHint)
+          Positioned.fill(
+          child: GestureDetector(
+            onTap: _dismissToolbarHint,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: AnimatedOpacity(
+                opacity: 1.0,
+                duration: const Duration(milliseconds: 250),
+                child: Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child:  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.swipe_rounded, size: 16, color: cs.onSurface),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Swipe to switch • Double-tap to close',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
+
   }
 
 }
